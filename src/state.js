@@ -38,6 +38,7 @@ function defaultState() {
       wordsMade: {},      // { 'СЛОВО': кол-во раз }
       solitaireLevel: 1,
       questsClaimed: [],
+      letterStage: 0,     // ступень открытого алфавита, см. LETTER_STAGES
     },
     stats: { shooterBest: 0, plays: {} },
     settings: { fullscreen: true, sound: true, vibro: true },
@@ -50,6 +51,8 @@ function migrate(s) {
   // неглубокое слияние: новые поля из дефолта, старые значения сохраняются
   const out = { ...d, ...s };
   for (const k of ['profile', 'oven', 'progress', 'stats', 'settings']) out[k] = { ...d[k], ...(s[k] || {}) };
+  // старые сохранения: алфавит уже был открыт целиком
+  if (s.created && (s.progress || {}).letterStage === undefined) out.progress.letterStage = 99;
   out.version = SAVE_VERSION;
   return out;
 }

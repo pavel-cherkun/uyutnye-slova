@@ -13,6 +13,7 @@ import { loadDict } from './data/dict.js';
 import { renderOrders, readyOrders } from './screens/orders.js';
 import { setupDevice } from './ui/device.js';
 import { maybeDailyGift, maybeIosHint } from './screens/settings.js';
+import { syncLetters } from './progression.js';
 
 const app = document.getElementById('app');
 const TABS = [
@@ -171,5 +172,6 @@ async function openGame(id) {
 window.game = { store, openGame };
 
 setupDevice();
+syncLetters();
 app.replaceChildren(h('div.splash', h('div.splash-logo', '🔤'), h('div.splash-text', 'Раскладываем буквы…')));
 loadDict().then(boot);
