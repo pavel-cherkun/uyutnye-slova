@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff7aa8"/><stop offset=".55" stop-color="#9a6bff"/><stop offset="1" stop-color="#3fa9ff"/></linearGradient>
+    <linearGradient id="t" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff7d6"/><stop offset="1" stop-color="#ffd86a"/></linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <circle cx="96" cy="100" r="22" fill="#fff" opacity=".35"/><circle cx="420" cy="410" r="30" fill="#fff" opacity=".25"/>
+  <g transform="rotate(-8 256 256)">
+    <rect x="96" y="150" width="150" height="170" rx="30" fill="#d9a92e"/><rect x="96" y="140" width="150" height="170" rx="30" fill="url(#t)"/>
+    <text x="171" y="270" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="120" text-anchor="middle" fill="#6b4300">С</text>
+  </g>
+  <g transform="rotate(9 256 256)">
+    <rect x="266" y="200" width="150" height="170" rx="30" fill="#d9a92e"/><rect x="266" y="190" width="150" height="170" rx="30" fill="url(#t)"/>
+    <text x="341" y="320" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="120" text-anchor="middle" fill="#6b4300">Л</text>
+  </g>
+  <text x="256" y="465" font-size="70" text-anchor="middle">🏠</text>
+</svg>
