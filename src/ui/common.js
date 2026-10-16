@@ -1,6 +1,7 @@
 // Общие UI-хелперы: создание элементов, тосты, модальные окна, показ наград.
 
 import { getItem, RARITY } from '../data/items.js';
+import { sfx, buzz } from './device.js';
 
 /** h('div.class#id', {attrs, onclick}, ...children) */
 export function h(sel, props, ...children) {
@@ -78,6 +79,8 @@ export function rewardChips(reward = {}) {
 }
 
 export function showReward(title, reward, onClose) {
+  sfx('reward');
+  buzz([10, 40, 10]);
   const chips = rewardChips(reward);
   const m = modal([
     h('div.modal-title', title),
@@ -113,6 +116,7 @@ export function pick(arr, rng = Math.random) { return arr[Math.floor(rng() * arr
 
 // Конфетти для праздничных моментов
 export function confetti(x = innerWidth / 2, y = innerHeight / 2, count = 30) {
+  sfx('win');
   const colors = ['#ff4f8b', '#ffc93c', '#3ad29f', '#3fa9ff', '#a66bff', '#ff8a3d'];
   for (let i = 0; i < count; i++) {
     const p = h('div.confetti', { style: { left: x + 'px', top: y + 'px', background: pick(colors) } });
