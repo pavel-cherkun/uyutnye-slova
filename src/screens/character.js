@@ -4,6 +4,7 @@ import { h, toast, modal, confirmDialog, confetti } from '../ui/common.js';
 import { avatarSVG, SKINS, HAIR_COLORS, EYE_COLORS, OUTFIT_COLORS, HAIR_STYLES, OUTFITS, BEARDS } from '../ui/avatar.js';
 import { state, commit, applyReward, exportSave, importSave, resetSave } from '../state.js';
 import { randomLetter } from '../data/letters.js';
+import { settingsCard } from './settings.js';
 
 const STARTER = {
   letters: 'КОТЛУКСОНМИР',
@@ -23,7 +24,7 @@ function editor(draft, onChange) {
 
   const body = h('div.stack');
   function rebuild() {
-    body.replaceChildren(
+    body.replaceChildren(...[
       h('div.ch-gender',
         h('button.ch-g' + (draft.gender === 'f' ? '.on' : ''), { onclick: () => set('gender', 'f') }, '♀ Женщина'),
         h('button.ch-g' + (draft.gender === 'm' ? '.on' : ''), { onclick: () => set('gender', 'm') }, '♂ Мужчина'),
@@ -36,7 +37,7 @@ function editor(draft, onChange) {
       swatches('Цвет одежды', OUTFIT_COLORS, 'outfitColor'),
       draft.gender === 'm' ? stepper('Борода', BEARDS, 'beard') : null,
       h('button.btn.btn-ghost', { onclick: randomize }, '🎲 Случайно'),
-    );
+    ].filter(Boolean));
   }
   function stepper(label, list, key) {
     const cur = draft[key] || 0;
@@ -102,7 +103,10 @@ export function renderProfile(root, refresh) {
   const name = h('input.ch-name', { maxlength: 16, value: draft.name });
   const words = Object.keys(state.progress.wordsMade).length;
 
+  const rerender = () => renderProfile(root, refresh);
   root.replaceChildren(h('div.screen.ch-screen',
+    h('div.screen-title', 'Профиль и настройки'),
+    settingsCard(rerender),
     preview,
     name,
     h('div.card', body),
@@ -123,9 +127,18 @@ export function renderProfile(root, refresh) {
         h('button.btn.btn-violet.btn-sm', { onclick: showExport }, 'Код сохранения'),
         h('button.btn.btn-violet.btn-sm', { onclick: showImport }, 'Загрузить код'),
       ),
-      h('button.btn.btn-ghost.btn-sm', {
-        onclick: async () => { if (await confirmDialog('Удалить весь прогресс и начать заново?', 'Удалить')) resetSave(); },
-      }, 'Начать заново'),
+      h('div.small.muted', state.savedAt ? `Последнее сохранение: ${new Date(state.savedAt).toLocaleString('ru')}` : ''),
+    ),
+    h('div.card.stack',
+      h('b', '🔄 Начать заново'),
+      h('div.small.muted', 'Новый персонаж, пустая квартира, всё с нуля. Прогресс удалится безвозвратно — если хочешь, сначала сохрани код сохранения.'),
+      h('button.btn.btn-sm.st-danger', {
+        onclick: async () => {
+          if (!await confirmDialog('Удалить весь прогресс и начать заново?', 'Удалить')) return;
+          if (!await confirmDialog('Точно? Вернуть будет нельзя.', 'Да, начать заново')) return;
+          resetSave();
+        },
+      }, 'Начать игру заново'),
     ),
   ));
 }
