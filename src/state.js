@@ -1,9 +1,12 @@
 // Состояние игрока и сохранение в localStorage.
 // Все изменения идут через функции этого модуля: они сохраняют и оповещают подписчиков.
+// Надёжность: запись сразу при сворачивании/закрытии вкладки, резервная копия раз в 30 секунд,
+// при старте — просьба к браузеру не удалять данные (navigator.storage.persist).
 
 import { normWord } from './data/letters.js';
 
 const SAVE_KEY = 'rita-game-save';
+const BACKUP_KEY = 'rita-game-save-backup';
 const SAVE_VERSION = 1;
 
 function defaultState() {
@@ -37,6 +40,8 @@ function defaultState() {
       questsClaimed: [],
     },
     stats: { shooterBest: 0, plays: {} },
+    settings: { fullscreen: true, sound: true, vibro: true },
+    savedAt: 0,
   };
 }
 
@@ -44,17 +49,20 @@ function migrate(s) {
   const d = defaultState();
   // неглубокое слияние: новые поля из дефолта, старые значения сохраняются
   const out = { ...d, ...s };
-  for (const k of ['profile', 'oven', 'progress', 'stats']) out[k] = { ...d[k], ...(s[k] || {}) };
+  for (const k of ['profile', 'oven', 'progress', 'stats', 'settings']) out[k] = { ...d[k], ...(s[k] || {}) };
   out.version = SAVE_VERSION;
   return out;
 }
 
 function load() {
-  try {
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (raw) return migrate(JSON.parse(raw));
-  } catch (e) {
-    console.warn('Не удалось прочитать сохранение', e);
+  // основное сохранение, при поломке — резервная копия
+  for (const key of [SAVE_KEY, BACKUP_KEY]) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) return migrate(JSON.parse(raw));
+    } catch (e) {
+      console.warn('Не удалось прочитать сохранение', key, e);
+    }
   }
   return defaultState();
 }
@@ -68,16 +76,40 @@ export function subscribe(fn) {
 }
 
 let saveTimer = null;
-export function commit() {
+let dirty = false;
+let lastBackup = 0;
+let frozen = false; // после сброса/импорта больше ничего не пишем
+
+export function saveNow() {
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) { console.warn(e); }
-  }, 50);
+  if (frozen || !dirty) return;
+  dirty = false;
+  state.savedAt = Date.now();
+  try {
+    const json = JSON.stringify(state);
+    localStorage.setItem(SAVE_KEY, json);
+    if (state.savedAt - lastBackup > 30000) { localStorage.setItem(BACKUP_KEY, json); lastBackup = state.savedAt; }
+  } catch (e) { console.warn('Не удалось сохранить', e); }
+}
+
+export function commit() {
+  dirty = true;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveNow, 150);
   for (const fn of listeners) fn(state);
 }
 
+// Сохранить сразу, когда приложение сворачивают или закрывают
+addEventListener('pagehide', saveNow);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveNow(); });
+// Попросить браузер не вычищать данные игры (особенно важно для Safari)
+try { navigator.storage?.persist?.(); } catch { /* не поддерживается */ }
+
 export function resetSave() {
+  frozen = true;
+  clearTimeout(saveTimer);
   localStorage.removeItem(SAVE_KEY);
+  localStorage.removeItem(BACKUP_KEY);
   location.reload();
 }
 
@@ -87,6 +119,9 @@ export function exportSave() {
 
 export function importSave(code) {
   const data = JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
+  if (!data || typeof data !== 'object' || !data.profile) throw new Error('bad save');
+  frozen = true;
+  clearTimeout(saveTimer);
   localStorage.setItem(SAVE_KEY, JSON.stringify(migrate(data)));
   location.reload();
 }

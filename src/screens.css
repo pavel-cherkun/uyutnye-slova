@@ -178,3 +178,23 @@
 .or-req.ok .or-req-n { color: #1a9c70; }
 .or-reward { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .or-rw { background: #fff7d6; border-radius: 99px; padding: 3px 9px; font-weight: 800; font-size: 13px; }
+
+/* ---------- Настройки ---------- */
+.st-row { display: flex; align-items: center; justify-content: space-between; border: 0; background: var(--card-soft); border-radius: 14px; padding: 10px 12px; font-weight: 800; font-size: 15px; }
+.st-sw { width: 46px; height: 28px; border-radius: 99px; background: #ddd2e8; position: relative; transition: background .2s; flex: none; }
+.st-sw.on { background: var(--green); }
+.st-knob { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,.2); transition: transform .2s; }
+.st-sw.on .st-knob { transform: translateX(18px); }
+.st-hint { background: #fff7d6; border-radius: 14px; padding: 10px 12px; font-size: 13px; line-height: 1.4; display: flex; flex-direction: column; gap: 4px; }
+.st-danger { background: linear-gradient(180deg, #ff7a7a, #e8445a); box-shadow: 0 3px 0 #b02a3d; }
+.hud-gear { width: 36px; height: 36px; font-size: 18px; }
+.ch-screen .screen-title { margin-bottom: 0; }
+
+/* HUD помещается и на узких экранах */
+.hud { gap: 4px; }
+.hud-pill { padding: 3px 8px 3px 5px; font-size: 13px; flex: 0 1 auto; min-width: 0; }
+@media (max-width: 360px) {
+  .hud-pill { font-size: 12px; padding: 3px 6px 3px 4px; }
+  .hud-pill .ic { font-size: 14px; }
+  .hud-avatar { width: 34px; height: 34px; }
+}

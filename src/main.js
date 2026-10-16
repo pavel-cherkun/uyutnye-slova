@@ -11,6 +11,8 @@ import { renderOven } from './screens/oven.js';
 import { renderGames, GAMES } from './screens/games.js';
 import { loadDict } from './data/dict.js';
 import { renderOrders, readyOrders } from './screens/orders.js';
+import { setupDevice } from './ui/device.js';
+import { maybeDailyGift, maybeIosHint } from './screens/settings.js';
 
 const app = document.getElementById('app');
 const TABS = [
@@ -42,6 +44,7 @@ function boot() {
   renderHud();
   renderTabs();
   refresh();
+  setTimeout(() => { if (!maybeDailyGift(maybeIosHint)) maybeIosHint(); }, 400);
 }
 
 let prevHud = {};
@@ -59,6 +62,8 @@ function renderHud() {
     pill('coins', '🪙', 'Монеты'),
     pill('keys', '🗝️', 'Ключи'),
     pill('letters', '🔤', 'Буквы'),
+    h('div.hud-spacer'),
+    h('button.btn-icon.hud-gear', { onclick: () => go('me'), 'aria-label': 'Настройки' }, '⚙️'),
   );
   prevHud = vals;
 }
@@ -165,5 +170,6 @@ async function openGame(id) {
 // Отладка из консоли
 window.game = { store, openGame };
 
+setupDevice();
 app.replaceChildren(h('div.splash', h('div.splash-logo', '🔤'), h('div.splash-text', 'Раскладываем буквы…')));
 loadDict().then(boot);
