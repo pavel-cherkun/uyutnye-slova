@@ -387,7 +387,7 @@ export function mount(root, ctx) {
       if (store.itemCount('ЛУПА') > 0) {
         store.removeItem('ЛУПА');
       } else if (!store.spendCoins(HINT_COST)) {
-        toast('Нужно ' + HINT_COST + ' 🪙 или лупа');
+        toast('Нужна лупа или ' + HINT_COST + ' 🪙. Лупу можно составить в «Эрудите»: ЛУПА', 3200);
         return;
       }
       updateHint();

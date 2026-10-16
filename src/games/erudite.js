@@ -1,11 +1,16 @@
 // Эрудит: составляешь слова из букв в сумке. Слово превращается в предмет, карточку, эссенцию
 // или открывает комнату. Буквы тратятся, за слово дают монеты по очкам букв.
 
-import { h, toast, confetti, pick } from '../ui/common.js';
+import { h, toast, confetti, pick, modal } from '../ui/common.js';
 import { classifyWord, getItem, ITEMS, ROOMS, CATEGORIES, RARITY } from '../data/items.js';
 import { CARD_WORDS, ESSENCE_WORDS } from '../data/words.js';
 import { ALPHABET, LETTER_SCORE, wordScore } from '../data/letters.js';
 import { dictWords, dictCat } from '../data/dict.js';
+import { isLetterOpen } from '../data/letters.js';
+import { nextStage, checkLetterUnlock, wordsCount } from '../progression.js';
+
+// Что делают инструменты — подсказка прямо в превью слова
+const TOOL_USE = { МОЛОТОК: 'бустер для «Три в ряд»', ЛУПА: 'подсказка в «Поиске»' };
 
 export const meta = {
   id: 'erudite', title: 'Эрудит', emoji: '🔤',
@@ -47,6 +52,11 @@ const CSS = `
 .er-key .s { position: absolute; bottom: 2px; right: 4px; font-size: 9px; color: #9b7420; font-weight: 800; }
 .er-key:disabled .tile { background: #ece6f3; box-shadow: 0 3px 0 #d6cce3; color: #b9adc9; }
 .er-key:disabled .n { display: none; }
+.er-key.lock .tile { background: #e4dcef; box-shadow: 0 3px 0 #cfc3df; color: transparent; }
+.er-key.lock .tile::after { content: '🔒'; position: absolute; font-size: 15px; color: initial; }
+.er-key.lock .n, .er-key.lock .s { display: none; }
+.er-next { font-size: 12px; font-weight: 800; color: var(--ink-soft); text-align: center; }
+.er-next .tile { width: 20px; height: 24px; font-size: 12px; box-shadow: 0 2px 0 #d9a92e; margin: 0 1px; }
 .er-made { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; min-height: 34px; }
 .er-made .chip { flex: none; animation: pop .3s; }
 .er-burst { position: absolute; left: 50%; top: 40%; font-size: 90px; transform: translate(-50%,-50%); animation: er-burst 1s forwards; pointer-events: none; z-index: 5; }
@@ -66,6 +76,8 @@ export function mount(root, ctx) {
   const keysEl = h('div.er-keys');
   const goalEl = h('div.er-goal');
   const madeEl = h('div.er-made');
+  const nextEl = h('div.er-next');
+  const plural = (n) => (n % 10 === 1 && n % 100 !== 11 ? 'слово' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'слова' : 'слов');
   const submitBtn = h('button.btn.btn-green', { onclick: submit }, 'Составить');
 
   root.append(
@@ -77,6 +89,7 @@ export function mount(root, ctx) {
     ),
     h('div.er-wrap',
       goalEl,
+      nextEl,
       h('div.er-board', wordEl, previewEl),
       h('div.er-actions',
         h('button.btn.btn-ghost', { onclick: () => { word = []; render(); } }, 'Стереть'),
@@ -95,7 +108,7 @@ export function mount(root, ctx) {
     wordEl.classList.remove('shake');
     wordEl.replaceChildren(...(word.length
       ? word.map((ch, i) => h('span.tile', { onclick: () => { word.splice(i, 1); render(); } }, ch))
-      : [h('div.er-empty', 'Нажимай на буквы снизу')]));
+      : [h('div.er-empty', wordsCount() < 3 ? 'Нажимай на буквы снизу. Попробуй: КОТ, СТОЛ, ЛИСТ, НОС' : 'Нажимай на буквы снизу')]));
 
     const w = word.join('');
     const c = w.length >= 2 ? classifyWord(w) : null;
@@ -109,7 +122,8 @@ export function mount(root, ctx) {
         : h('span.room', `🔓 Откроет комнату «${c.room.name}»!`));
       else {
         const it = getItem(c.id);
-        const label = c.kind === 'item' ? RARITY[it.rarity].name.toLowerCase() + ' предмет'
+        const label = TOOL_USE[c.id] ? 'инструмент: ' + TOOL_USE[c.id]
+          : c.kind === 'item' ? RARITY[it.rarity].name.toLowerCase() + ' предмет'
           : c.kind === 'card' ? 'карточка · ' + CATEGORIES[it.cat].name.toLowerCase() : 'эссенция для печи';
         previewEl.append(h('span', `→ ${it.emoji} ${label} · +${score} 🪙`));
       }
@@ -117,11 +131,18 @@ export function mount(root, ctx) {
 
     keysEl.replaceChildren(...ALPHABET.filter((ch) => ch !== 'Ъ' || state.letters[ch]).map((ch) => {
       const n = avail(ch);
+      if (!isLetterOpen(ch) && !n) {
+        return h('button.er-key.lock', {
+          onclick: () => { const ns = nextStage(); toast(ns ? `Буква откроется, когда составишь ещё слов: ${Math.max(1, ns.need)}` : 'Скоро откроется'); },
+        }, h('span.tile', ch));
+      }
       return h('button.er-key', { disabled: n <= 0, onclick: () => { word.push(ch); navigator.vibrate?.(5); render(); } },
         h('span.tile', ch), h('span.n', n), h('span.s', LETTER_SCORE[ch]));
     }));
 
     renderGoal();
+    const ns = nextStage();
+    nextEl.replaceChildren(...(ns ? ['🔓 Новые буквы ', ...[...ns.letters].map((ch) => h('span.tile', ch)), ` — ещё ${Math.max(0, ns.need)} ${plural(ns.need)}`] : []));
     madeEl.replaceChildren(...made.map((m) => h('div.chip', h('span.chip-emoji', m.emoji), h('span.chip-word', m.word.toLowerCase()))));
   }
 
@@ -169,7 +190,19 @@ export function mount(root, ctx) {
     root.append(burst); setTimeout(() => burst.remove(), 1000);
     word = [];
     store.commit();
+    const opened = checkLetterUnlock();
     render();
+    if (opened) {
+      setTimeout(() => {
+        confetti(innerWidth / 2, innerHeight / 3, 50);
+        const m = modal([
+          h('div.modal-title', 'Открыты новые буквы!'),
+          h('div.letters-row', [...opened].map((ch) => h('span.tile', ch))),
+          h('div.center.small', 'Теперь они будут выпадать в «Блоках». Новые буквы — новые слова и предметы.'),
+          h('button.btn.btn-big', { onclick: () => m.close() }, 'Ура!'),
+        ]);
+      }, 700);
+    }
   }
 
   function hint() {

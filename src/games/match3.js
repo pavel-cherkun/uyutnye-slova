@@ -529,6 +529,7 @@ const CSS = `
 .m3-bottom { display:flex; gap:10px; align-items:center; justify-content:center; padding:6px 12px calc(10px + var(--safe-bottom)); }
 .m3-hammer { display:flex; align-items:center; gap:6px; }
 .m3-hammer.m3-on { background: linear-gradient(180deg,#fff08a,var(--yellow)); color:var(--ink); box-shadow:0 5px 0 #d79a00; animation: m3-pulse .8s infinite; }
+.m3-hammer.m3-empty { filter: grayscale(.7); opacity: .7; }
 .m3-hammer .m3-n { background:rgba(255,255,255,.35); border-radius:999px; padding:0 8px; font-size:14px; }
 .m3-lose-goals { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
 .m3-no-anim, .m3-no-anim * { transition:none !important; }
@@ -819,7 +820,7 @@ function playLevel(root, ctx, chosen) {
     const n = store.itemCount('МОЛОТОК');
     hammerBtn.innerHTML = '';
     hammerBtn.append('🔨 Молоток', h('span.m3-n', n > 0 ? '×' + n : 'нет'));
-    hammerBtn.disabled = n <= 0;
+    hammerBtn.classList.toggle('m3-empty', n <= 0);
     if (n <= 0 && hammerMode) setHammer(false);
   }
 
@@ -831,7 +832,10 @@ function playLevel(root, ctx, chosen) {
 
   function onHammer() {
     if (busy || ended) return;
-    if (store.itemCount('МОЛОТОК') <= 0) return;
+    if (store.itemCount('МОЛОТОК') <= 0) {
+      toast('Молотка нет. Составь МОЛОТОК в «Эрудите» или найди в «Поиске» (Кабинет)', 3200);
+      return;
+    }
     setSel(null);
     setHammer(!hammerMode);
     if (hammerMode) toast('Тапни по фишке, чтобы разбить её 🔨');
