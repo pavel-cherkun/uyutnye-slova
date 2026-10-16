@@ -3,17 +3,10 @@
 import { h, toast, modal, confirmDialog, confetti } from '../ui/common.js';
 import { avatarSVG, SKINS, HAIR_COLORS, EYE_COLORS, OUTFIT_COLORS, HAIR_STYLES, OUTFITS, BEARDS } from '../ui/avatar.js';
 import { state, commit, applyReward, exportSave, importSave, resetSave } from '../state.js';
-import { randomLetter } from '../data/letters.js';
 import { settingsCard } from './settings.js';
 
-const STARTER = {
-  letters: 'КОТЛУКСОНМИР',
-  items: {
-    ЯБЛОКО: 2, КОФЕ: 1, ЛУПА: 2, МОЛОТОК: 2, СТУЛ: 1, ЛАМПА: 1, ФИКУС: 1,
-    // по паре карточек в двух категориях — чтобы пасьянс был доступен сразу
-    'card:СТОЛ': 1, 'card:ПОЛКА': 1, 'card:ПИОН': 1, 'card:ЛИЛИЯ': 1,
-  },
-};
+// Старт скромный: всё остальное добывается в играх. Буквы на первое слово — КОТ.
+const STARTER = { letters: 'КОТ' };
 
 function editor(draft, onChange) {
   const preview = h('div.ch-preview');
@@ -86,9 +79,8 @@ export function renderCreate(root, done) {
         state.profile = draft;
         state.created = true;
         // Стартовый набор: немного букв и предметов, чтобы сразу было во что играть
-        let extra = '';
-        for (let i = 0; i < 14; i++) extra += randomLetter();
-        applyReward({ ...STARTER, letters: STARTER.letters + extra });
+        state.progress.letterStage = 0;
+        applyReward(STARTER);
         commit();
         confetti();
         done();
