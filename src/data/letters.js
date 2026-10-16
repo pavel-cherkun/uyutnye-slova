@@ -14,11 +14,25 @@ export const LETTER_WEIGHT = {
   Ц: 0.6, Щ: 0.4, Э: 0.4, Ф: 0.4, Ъ: 0.15,
 };
 
-const WEIGHT_TOTAL = Object.values(LETTER_WEIGHT).reduce((a, b) => a + b, 0);
+// Алфавит открывается ступенями: сначала самые частые буквы, редкие — по мере составленных слов.
+// words — сколько разных слов нужно составить в Эрудите, чтобы открыть ступень.
+export const LETTER_STAGES = [
+  { words: 0, letters: 'АОЕИНТСРКЛ' },
+  { words: 3, letters: 'МПДУВ' },
+  { words: 8, letters: 'ЯЫЬГЗБ' },
+  { words: 15, letters: 'ЧЙХЖШ' },
+  { words: 25, letters: 'ЮЦЩЭФЪ' },
+];
+
+let allowed = null; // null — весь алфавит
+export function setAllowedLetters(str) { allowed = str ? new Set(str) : null; }
+export function isLetterOpen(ch) { return !allowed || allowed.has(ch); }
 
 export function randomLetter(rng = Math.random) {
-  let r = rng() * WEIGHT_TOTAL;
-  for (const [ch, w] of Object.entries(LETTER_WEIGHT)) {
+  const pool = Object.entries(LETTER_WEIGHT).filter(([ch]) => isLetterOpen(ch));
+  const total = pool.reduce((a, [, w]) => a + w, 0);
+  let r = rng() * total;
+  for (const [ch, w] of pool) {
     r -= w;
     if (r <= 0) return ch;
   }
