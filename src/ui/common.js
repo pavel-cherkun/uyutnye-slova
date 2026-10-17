@@ -1,7 +1,8 @@
 // Общие UI-хелперы: создание элементов, тосты, модальные окна, показ наград.
 
 import { getItem, RARITY } from '../data/items.js';
-import { sfx, buzz } from './device.js';
+import { sfx } from './device.js';
+import { revealReward } from './fx.js';
 
 /** h('div.class#id', {attrs, onclick}, ...children) */
 export function h(sel, props, ...children) {
@@ -78,15 +79,7 @@ export function rewardChips(reward = {}) {
 }
 
 export function showReward(title, reward, onClose) {
-  sfx('reward');
-  buzz([10, 40, 10]);
-  const chips = rewardChips(reward);
-  const m = modal([
-    h('div.modal-title', title),
-    chips.length ? h('div.reward-list', chips) : h('p.muted', 'В этот раз без трофеев'),
-    h('button.btn.btn-big', { onclick: () => m.close() }, 'Забрать'),
-  ], { onClose });
-  return m;
+  return revealReward(title, reward, onClose);
 }
 
 export function confirmDialog(text, yesLabel = 'Да') {
