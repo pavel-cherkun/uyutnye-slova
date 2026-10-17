@@ -3,7 +3,7 @@
 import { h, toast, modal } from '../ui/common.js';
 import { state, removeItem, addEnergy } from '../state.js';
 import { getItem, CATEGORIES, RARITY, eatValue, burnValue, isPlaceable } from '../data/items.js';
-import { ALPHABET, LETTER_SCORE } from '../data/letters.js';
+import { ALPHABET } from '../data/letters.js';
 import { ovenMult } from './oven.js';
 
 let tab = 'items';
@@ -35,7 +35,7 @@ function lettersView(nav) {
     h('div.bag-letters', ALPHABET.map((ch) => {
       const n = state.letters[ch] || 0;
       return h('div.bag-letter' + (n ? '' : '.empty'),
-        h('span.tile', ch, h('sub.tile-score', LETTER_SCORE[ch])),
+        h('span.tile', ch),
         h('span.bag-letter-n', '×' + n));
     })),
 

@@ -1,7 +1,7 @@
-// Доска заказов соседей: просят ресурсы из разных игр, платят монетами, ключами и редкими предметами.
+// Доска заказов соседей: просят ресурсы из разных игр, платят энергией, ключами и редкими предметами.
 
 import { h, toast, confetti, showReward, pick } from '../ui/common.js';
-import { state, commit, removeItem, applyReward, spendCoins } from '../state.js';
+import { state, commit, removeItem, applyReward, spendEnergy } from '../state.js';
 import { ITEMS, CATEGORIES, getItem, RARITY } from '../data/items.js';
 import { CARD_WORDS } from '../data/words.js';
 
@@ -16,7 +16,7 @@ const NEIGHBOURS = [
 ];
 
 const SLOTS = 3;
-const REPLACE_COST = 5;
+const REPLACE_COST = 2; // энергии
 
 /** Новый заказ. Сложность растёт с числом выполненных заказов. */
 function makeOrder(taken) {
@@ -40,9 +40,8 @@ function makeOrder(taken) {
   if (!reqs.length) reqs.push({ type: 'card', cat: nb.cats[0], n: 1 });
   // награда
   const weight = reqs.reduce((s, q) => s + (q.type === 'item' ? 2 * q.n : q.n), 0);
-  const reward = { coins: 15 + weight * 8 };
-  if (Math.random() < 0.4) reward.keys = 1;
-  if (Math.random() < 0.5) reward.energy = 5 + weight;
+  const reward = { energy: 6 + weight * 3 };
+  if (Math.random() < 0.5) reward.keys = 1;
   if (Math.random() < 0.35 + done * 0.02) {
     const rare = ITEMS.filter((it) => nb.cats.includes(it.cat) && it.rarity !== 'c');
     if (rare.length) reward.items = { [pick(rare).id]: 1 };
@@ -120,7 +119,6 @@ export function renderOrders(root, nav) {
         h('div.or-head', h('span.or-ava', nb.emoji), h('b', nb.name)),
         h('div.or-reqs', o.reqs.map(reqView)),
         h('div.or-reward', h('span', '🎁'),
-          o.reward.coins ? h('span.or-rw', `🪙 ${o.reward.coins}`) : null,
           o.reward.keys ? h('span.or-rw', `🗝️ ${o.reward.keys}`) : null,
           o.reward.energy ? h('span.or-rw', `⚡ ${o.reward.energy}`) : null,
           ...Object.keys(o.reward.items || {}).map((id) => h('span.or-rw', { style: { boxShadow: `inset 0 0 0 2px ${RARITY[getItem(id).rarity].color}` } }, getItem(id).emoji + ' ' + getItem(id).word.toLowerCase())),
@@ -128,11 +126,11 @@ export function renderOrders(root, nav) {
         h('div.row',
           h('button.btn.btn-ghost.btn-sm', {
             onclick: () => {
-              if (!spendCoins(REPLACE_COST)) { toast('Не хватает монет'); return; }
+              if (!spendEnergy(REPLACE_COST)) { toast('Нужно ' + REPLACE_COST + ' ⚡'); return; }
               state.progress.orders[i] = makeOrder(list.filter((_, j) => j !== i).map((x) => x.nb));
               commit(); rerender();
             },
-          }, `🔄 ${REPLACE_COST}🪙`),
+          }, `🔄 ${REPLACE_COST}⚡`),
           h('button.btn.btn-green.btn-sm', { disabled: !ready, style: { boxShadow: '0 3px 0 #1a9c70' }, onclick: () => fulfil(i, rerender) }, ready ? 'Отдать ✓' : 'Отдать'),
         ),
       );

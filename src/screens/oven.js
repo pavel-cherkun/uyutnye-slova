@@ -1,12 +1,12 @@
 // Печь: сжигание предметов, слов и эссенций в энергию; запекание дублей в новые предметы; улучшение.
 
 import { h, toast, confetti, showReward, pick } from '../ui/common.js';
-import { state, commit, removeItem, addEnergy, spendCoins, applyReward, MAX_ENERGY } from '../state.js';
+import { state, commit, removeItem, addEnergy, spendKeys, applyReward, MAX_ENERGY } from '../state.js';
 import { getItem, burnValue, RARITY, ITEMS, itemsByCat } from '../data/items.js';
 
 export const OVEN_MAX = 5;
 export function ovenMult() { return 1 + 0.25 * (state.oven.level - 1); }
-function upgradeCost() { return 60 * state.oven.level; }
+function upgradeCost() { return state.oven.level; } // ключей
 
 let selected = {}; // id -> сколько положить
 
@@ -73,10 +73,10 @@ export function renderOven(root) {
       state.oven.level < OVEN_MAX ? h('button.btn.btn-yellow', {
         style: { flex: 'none' },
         onclick: () => {
-          if (!spendCoins(upgradeCost())) { toast('Не хватает монет'); return; }
+          if (!spendKeys(upgradeCost())) { toast('Нужно ключей: ' + upgradeCost() + ' 🗝️'); return; }
           state.oven.level++; commit(); confetti(); rerender();
         },
-      }, `${upgradeCost()} 🪙`) : null,
+      }, `${upgradeCost()} 🗝️`) : null,
     ),
   ));
 }
