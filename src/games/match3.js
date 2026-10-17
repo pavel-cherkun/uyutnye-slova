@@ -407,6 +407,49 @@ export class Board {
     return this._cascade(this._phase(new Set([key(r, c)]), [], 1));
   }
 
+  /** Общий бустер: очистить набор клеток (спецфишки в нём срабатывают цепочкой), затем каскад. */
+  blast(cells, effects = []) {
+    const keys = new Set();
+    for (const [r, c] of cells) if (this.get(r, c)) keys.add(key(r, c));
+    if (!keys.size) return null;
+    return this._cascade(this._phase(keys, [], 1, [], effects));
+  }
+
+  /** Бустер «Бомба»: взрыв 3×3 вокруг клетки. */
+  bomb3(r, c) {
+    if (!this.get(r, c)) return null;
+    const cells = [];
+    for (let y = r - 1; y <= r + 1; y++) for (let x = c - 1; x <= c + 1; x++) cells.push([y, x]);
+    return this.blast(cells, [{ kind: 'bomb', r, c, rad: 1 }]);
+  }
+
+  /** Бустер «Ножницы»: весь ряд. */
+  clearRow(r, c = 0) {
+    if (!this.get(r, c)) return null;
+    return this.blast(Array.from({ length: this.size }, (_, x) => [r, x]), [{ kind: 'row', r, c }]);
+  }
+
+  /** Бустер «Топор»: весь столбец. */
+  clearCol(c, r = 0) {
+    if (!this.get(r, c)) return null;
+    return this.blast(Array.from({ length: this.size }, (_, y) => [y, c]), [{ kind: 'col', r, c }]);
+  }
+
+  /** Бустер «Магнит»: все фишки типа фишки в клетке (по радуге — самого частого типа). */
+  magnet(r, c) {
+    const t = this.get(r, c);
+    if (!t) return null;
+    let type = t.type;
+    if (t.special === 'rainbow') {
+      const cnt = Array(this.ntypes).fill(0);
+      for (let y = 0; y < this.size; y++) for (let x = 0; x < this.size; x++) { const m = this.mt(y, x); if (m >= 0) cnt[m]++; }
+      type = cnt.indexOf(Math.max(...cnt));
+    }
+    const cells = [[r, c]];
+    for (let y = 0; y < this.size; y++) for (let x = 0; x < this.size; x++) if (this.mt(y, x) === type) cells.push([y, x]);
+    return this.blast(cells, [{ kind: 'magnet', r, c, type }]);
+  }
+
   /** Финальный салют: n случайных обычных фишек превращаются в ракеты, затем взрываются все спецфишки. */
   salute(n) {
     const S = this.size, normal = [], upgrades = [];
@@ -470,6 +513,17 @@ const COLORS = [
   ['#8c7bff', '#5a46e0'], // фиолетовый
 ];
 
+// Бустеры — инструменты из сумки. target: нужен тап по клетке; gen — «Нет …».
+const BOOSTERS = [
+  { id: 'МОЛОТОК', emoji: '🔨', name: 'Молоток', gen: 'молотка', target: true, hint: 'Тапни по фишке — разобью 🔨' },
+  { id: 'БОМБА', emoji: '💣', name: 'Бомба', gen: 'бомбы', target: true, hint: 'Тапни по клетке — взрыв 3×3 💣' },
+  { id: 'НОЖНИЦЫ', emoji: '✂️', name: 'Ножницы', gen: 'ножниц', target: true, hint: 'Тапни по клетке — срежу весь ряд ✂️' },
+  { id: 'ТОПОР', emoji: '🪓', name: 'Топор', gen: 'топора', target: true, hint: 'Тапни по клетке — срублю весь столбец 🪓' },
+  { id: 'МАГНИТ', emoji: '🧲', name: 'Магнит', gen: 'магнита', target: true, hint: 'Тапни по фишке — заберу все такие 🧲' },
+  { id: 'КОМПАС', emoji: '🧭', name: 'Компас', gen: 'компаса', target: false },
+];
+const FX_MAX = 12; // одновременных частиц/вспышек на поле
+
 const SPECIAL_NAME = { rocketH: 'РАКЕТА!', rocketV: 'РАКЕТА!', bomb: 'БОМБА!', rainbow: 'РАДУГА!' };
 // Надписи каскада: чем длиннее цепочка, тем крупнее и безумнее
 const COMBO = [
@@ -492,7 +546,7 @@ const CSS = `
 .m3-moves b { font-family:var(--display); font-weight:900; font-size:24px; letter-spacing:-1px; }
 .m3-moves small { font-size:9px; font-weight:900; letter-spacing:1px; text-transform:uppercase; color:#fff; opacity:.75; margin-top:2px; }
 .m3-moves.m3-tick { animation:m3-tick .35s cubic-bezier(.3,1.8,.5,1); }
-.m3-moves.m3-low { background:#ff3b3b; color:#fff; box-shadow:0 4px 0 var(--ink); animation:m3-danger .8s ease-in-out infinite; }
+.m3-moves.m3-low { background:#ff3b3b; color:#fff; box-shadow:0 4px 0 var(--ink); }
 .m3-moves.m3-low small { opacity:1; }
 .m3-goals { display:flex; gap:10px; justify-content:center; padding:6px 10px 2px; flex-wrap:wrap; }
 .m3-goal { position:relative; display:flex; align-items:center; gap:7px; background:#fff; border:2.5px solid var(--ink); border-radius:18px;
@@ -509,7 +563,7 @@ const CSS = `
   background:#fff; box-shadow:0 6px 0 var(--ink); }
 .m3-board.m3-shake { animation:m3-shake .35s; }
 .m3-board.m3-shake2 { animation:m3-shake2 .5s; }
-.m3-root.m3-danger .m3-board:not(.m3-shake):not(.m3-shake2) { animation:m3-redglow 1s ease-in-out infinite; }
+.m3-root.m3-danger .m3-board { box-shadow:0 6px 0 var(--ink), 0 0 0 5px rgba(255,59,59,.5); }
 .m3-board.m3-hammering { outline:4px dashed var(--orange); outline-offset:4px; }
 .m3-cellbg { position:absolute; border-radius:24%; background:#f0eee3; }
 .m3-cellbg.m3-alt { background:#e6e4d7; }
@@ -519,15 +573,15 @@ const CSS = `
   transition:transform .15s; line-height:1; }
 .m3-gem .m3-em { position:relative; z-index:1; pointer-events:none; }
 .m3-gem::after { content:''; position:absolute; left:13%; top:9%; width:30%; height:15%; border-radius:99px; background:rgba(255,255,255,.75); pointer-events:none; z-index:1; }
-.m3-sel .m3-gem { transform:translateY(-3px) scale(1.1); box-shadow:0 5px 0 var(--ink), 0 0 0 3px var(--lime), 0 0 0 5.5px var(--ink); animation:m3-wiggle .6s infinite; }
+.m3-sel .m3-gem { transform:translateY(-3px) scale(1.1) rotate(-6deg); box-shadow:0 5px 0 var(--ink), 0 0 0 3px var(--lime), 0 0 0 5.5px var(--ink); }
 .m3-hint .m3-gem { animation:m3-wiggle .5s 3; }
 .m3-gem.m3-rocketH::before, .m3-gem.m3-rocketV::before { content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
   background:repeating-linear-gradient(0deg, rgba(17,17,17,.22) 0 3px, transparent 3px 8px); }
 .m3-gem.m3-rocketV::before { background:repeating-linear-gradient(90deg, rgba(17,17,17,.22) 0 3px, transparent 3px 8px); }
-.m3-gem.m3-bomb { box-shadow:0 3px 0 var(--ink), 0 0 0 3px #fff, 0 0 0 5px var(--ink); animation:m3-glowb .7s ease-in-out infinite alternate; }
+.m3-gem.m3-bomb { box-shadow:0 3px 0 var(--ink), 0 0 0 3px #fff, 0 0 0 5px var(--ink); }
 .m3-gem.m3-rainbow { overflow:hidden; background:#fff; }
 .m3-gem.m3-rainbow::before { content:''; position:absolute; inset:-35%; pointer-events:none;
-  background:conic-gradient(var(--pink), var(--orange), var(--yellow), var(--lime), var(--blue), var(--violet), var(--pink)); animation:m3-spin 2.4s linear infinite; }
+  background:conic-gradient(from 30deg, var(--pink), var(--orange), var(--yellow), var(--lime), var(--blue), var(--violet), var(--pink)); }
 .m3-badge { position:absolute; right:-14%; bottom:-14%; z-index:2; font-size:.42em; background:var(--ink); color:var(--lime); border:1.5px solid var(--ink);
   border-radius:50%; width:1.6em; height:1.6em; display:flex; align-items:center; justify-content:center; font-weight:900; }
 .m3-tile.m3-pop .m3-gem { animation:m3-pop .28s ease-in forwards; }
@@ -537,11 +591,12 @@ const CSS = `
 .m3-part { position:absolute; width:9px; height:9px; border-radius:3px; border:1.5px solid var(--ink); pointer-events:none; z-index:4;
   animation:m3-part .55s cubic-bezier(.2,.7,.4,1) forwards; }
 .m3-beam { position:absolute; pointer-events:none; z-index:5; border-radius:999px; background:var(--lime); border:3px solid var(--ink);
-  box-shadow:0 0 0 5px rgba(200,255,46,.45), 0 0 22px 8px rgba(200,255,46,.8); }
+  box-shadow:0 0 0 5px rgba(200,255,46,.5); will-change:transform; }
 .m3-beam.m3-h { animation:m3-beamh .45s ease-out forwards; }
 .m3-beam.m3-v { animation:m3-beamv .45s ease-out forwards; }
 .m3-ring { position:absolute; border-radius:50%; pointer-events:none; z-index:5; border:5px solid var(--ink);
-  box-shadow:inset 0 0 0 6px var(--lime), 0 0 0 6px var(--lime), 0 0 30px 10px rgba(255,122,26,.7); animation:m3-ring .5s ease-out forwards; }
+  box-shadow:inset 0 0 0 6px var(--lime), 0 0 0 6px var(--lime), 0 0 0 11px rgba(255,122,26,.55); animation:m3-ring .5s ease-out forwards; will-change:transform; }
+.m3-ring.m3-mag { border-color:var(--ink); box-shadow:inset 0 0 0 5px var(--pink), 0 0 0 5px var(--blue); animation-direction:reverse; }
 .m3-ring.m3-rb { border:0; box-shadow:none; background:conic-gradient(var(--pink), var(--orange), var(--yellow), var(--lime), var(--blue), var(--violet), var(--pink));
   -webkit-mask:radial-gradient(circle, transparent 44%, #000 46%); mask:radial-gradient(circle, transparent 44%, #000 46%); }
 .m3-burst { position:absolute; pointer-events:none; z-index:6; border-radius:50%;
@@ -568,24 +623,30 @@ const CSS = `
 .m3-banner.m3-warn { background:#ff3b3b; color:#fff; text-shadow:0 2px 0 var(--ink); }
 .m3-win { position:absolute; inset:0; z-index:30; pointer-events:none; display:flex; align-items:center; justify-content:center; overflow:hidden; }
 .m3-win-rays { position:absolute; width:900px; height:900px; left:50%; top:50%; margin:-450px 0 0 -450px; opacity:.55;
-  background:repeating-conic-gradient(rgba(200,255,46,.9) 0 10deg, transparent 10deg 20deg); animation:m3-spin 10s linear infinite;
+  background:repeating-conic-gradient(rgba(200,255,46,.9) 0 10deg, transparent 10deg 20deg); animation:m3-spin 16s linear both;
   -webkit-mask:radial-gradient(circle, #000 0 15%, transparent 55%); mask:radial-gradient(circle, #000 0 15%, transparent 55%); }
 .m3-win-txt { position:relative; font-family:var(--display); font-weight:900; font-size:min(54px, 13vw); letter-spacing:-2px; color:var(--lime);
   background:var(--ink); border:4px solid var(--ink); border-radius:26px; padding:12px 24px 10px; box-shadow:0 8px 0 rgba(17,17,17,.35), 0 0 0 5px var(--lime);
   transform:rotate(-4deg); animation:m3-winin .6s cubic-bezier(.2,1.8,.4,1) both; }
 .m3-win.m3-out { transition:opacity .3s; opacity:0; }
-.m3-bottom { display:flex; gap:10px; align-items:center; justify-content:center; padding:4px 12px calc(12px + var(--safe-bottom)); }
-.m3-hammer { display:flex; align-items:center; gap:8px; background:#fff; color:var(--ink); font-family:var(--display); font-weight:800; font-size:14px;
-  text-transform:uppercase; letter-spacing:-.3px; }
-.m3-hammer.m3-on { background:var(--yellow); animation:m3-pulse .8s infinite; }
-.m3-hammer.m3-empty { filter:grayscale(.8); opacity:.6; }
-.m3-hammer .m3-n { background:var(--ink); color:var(--lime); border-radius:999px; padding:2px 8px; font-size:12px; }
+.m3-bottom { display:flex; gap:6px; align-items:stretch; justify-content:center; padding:2px 10px calc(10px + var(--safe-bottom)); }
+.m3-bst { position:relative; flex:1 1 0; min-width:0; max-width:64px; height:52px; padding:0; display:flex; align-items:center; justify-content:center;
+  background:#fff; color:var(--ink); border:2.5px solid var(--ink); border-radius:16px; box-shadow:0 4px 0 var(--ink); font:inherit;
+  touch-action:manipulation; -webkit-tap-highlight-color:transparent; user-select:none; -webkit-user-select:none; transition:transform .08s; }
+.m3-bst:active { transform:translateY(3px); box-shadow:0 1px 0 var(--ink); }
+.m3-bst .m3-bem { font-size:25px; line-height:1; pointer-events:none; }
+.m3-bst .m3-n { position:absolute; top:-8px; right:-6px; background:var(--ink); color:var(--lime); border-radius:999px; padding:1px 6px;
+  font-family:var(--display); font-size:11px; font-weight:900; pointer-events:none; }
+.m3-bst.m3-on { background:var(--yellow); transform:translateY(-4px); box-shadow:0 6px 0 var(--ink), 0 0 0 3px var(--lime), 0 0 0 5px var(--ink); }
+.m3-bst.m3-empty { background:#ece9dc; border-color:rgba(17,17,17,.35); box-shadow:0 3px 0 rgba(17,17,17,.25); }
+.m3-bst.m3-empty .m3-bem { opacity:.4; }
+.m3-bst.m3-empty .m3-n { background:#bbb; color:#fff; }
 .m3-modal { text-align:center; }
 .m3-modal .modal-title { font-size:24px; text-transform:uppercase; }
 .m3-modal .m3-sub { font-weight:800; color:var(--ink-soft); margin:2px 0 12px; }
 .m3-modal .m3-lose-goals { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-bottom:16px; }
 .m3-modal .btn { opacity:1; margin-top:10px; font-family:var(--display); text-transform:uppercase; font-size:16px; }
-@keyframes m3-pop { 0% { transform:scale(1); filter:brightness(1); } 40% { transform:scale(1.35) rotate(8deg); filter:brightness(1.5); } 100% { transform:scale(0) rotate(-20deg); opacity:0; } }
+@keyframes m3-pop { 0% { transform:scale(1); } 40% { transform:scale(1.35) rotate(8deg); } 100% { transform:scale(0) rotate(-20deg); opacity:0; } }
 @keyframes m3-born { 0% { transform:scale(0) rotate(-40deg); } 100% { transform:scale(1); } }
 @keyframes m3-flash { 0% { transform:scale(.3); opacity:1; } 100% { transform:scale(1.6); opacity:0; } }
 @keyframes m3-part { 0% { transform:translate(0,0) scale(1) rotate(0); opacity:1; } 100% { transform:translate(var(--dx),var(--dy)) scale(.2) rotate(var(--rot)); opacity:0; } }
@@ -596,17 +657,13 @@ const CSS = `
 @keyframes m3-tag { 0% { transform:translate(-50%,-50%) scale(.3); opacity:0; } 25% { transform:translate(-50%,-80%) scale(1.15); opacity:1; } 70% { transform:translate(-50%,-110%) scale(1); opacity:1; } 100% { transform:translate(-50%,-150%) scale(.9); opacity:0; } }
 @keyframes m3-shake { 0%,100% { transform:translate(0,0); } 25% { transform:translate(-4px,2px); } 50% { transform:translate(4px,-3px); } 75% { transform:translate(-3px,-2px); } }
 @keyframes m3-shake2 { 0%,100% { transform:translate(0,0) rotate(0); } 15% { transform:translate(-9px,5px) rotate(-1.5deg); } 30% { transform:translate(8px,-6px) rotate(1.2deg); } 50% { transform:translate(-6px,-4px) rotate(-.8deg); } 70% { transform:translate(5px,6px) rotate(.6deg); } 85% { transform:translate(-3px,2px); } }
-@keyframes m3-redglow { 0%,100% { box-shadow:0 6px 0 var(--ink), 0 0 0 0 rgba(255,59,59,0); } 50% { box-shadow:0 6px 0 var(--ink), 0 0 0 7px rgba(255,59,59,.55); } }
-@keyframes m3-danger { 0%,100% { transform:scale(1); } 50% { transform:scale(1.1); } }
 @keyframes m3-tick { 40% { transform:scale(1.18) rotate(-4deg); } }
 @keyframes m3-banner { 0% { transform:translate(-50%,-50%) rotate(var(--rot)) scale(.2); opacity:0; } 22% { transform:translate(-50%,-50%) rotate(var(--rot)) scale(1.15); opacity:1; }
   35% { transform:translate(-50%,-50%) rotate(var(--rot)) scale(1); } 75% { transform:translate(-50%,-62%) rotate(var(--rot)) scale(1); opacity:1; } 100% { transform:translate(-50%,-90%) rotate(var(--rot)) scale(.85); opacity:0; } }
 @keyframes m3-gbump { 40% { transform:scale(1.18) rotate(-5deg); } 70% { transform:scale(.96) rotate(2deg); } }
 @keyframes m3-checkin { 0% { transform:scale(0) rotate(-120deg); } }
 @keyframes m3-winin { 0% { transform:rotate(-30deg) scale(.1); } }
-@keyframes m3-pulse { 50% { transform:scale(1.07); } }
 @keyframes m3-wiggle { 0%,100% { transform:translateY(-3px) scale(1.1) rotate(0); } 25% { transform:translateY(-3px) scale(1.1) rotate(-8deg); } 75% { transform:translateY(-3px) scale(1.1) rotate(8deg); } }
-@keyframes m3-glowb { from { transform:scale(.94); } to { transform:scale(1.06); filter:brightness(1.15); } }
 @keyframes m3-spin { to { transform:rotate(360deg); } }
 `;
 
@@ -622,7 +679,7 @@ function playLevel(root, ctx, chosen) {
   let ended = false;
   let movesLeft = cfg.moves;
   let extraUsed = false;
-  let hammerMode = false;
+  let boost = null; // активный бустер, ждущий тапа по клетке
   let lowWarned = false;
   let sel = null; // [r,c]
   let cell = 40;
@@ -632,8 +689,11 @@ function playLevel(root, ctx, chosen) {
   const els = new Map(); // id тайла → элемент
   const timers = new Set();
 
-  const wait = (ms) => new Promise((res) => setTimeout(res, ms));
+  const wait = (ms) => new Promise((res) => { const t = setTimeout(() => { timers.delete(t); res(); }, ms); timers.add(t); });
   const later = (fn, ms) => { const t = setTimeout(() => { timers.delete(t); if (alive) fn(); }, ms); timers.add(t); };
+  /** Убрать временный элемент эффекта через ms (таймер учитывается и снимается при выходе) */
+  const drop = (el, ms) => { const t = setTimeout(() => { timers.delete(t); el.remove(); }, ms); timers.add(t); };
+  let fxLive = 0; // сколько частиц/вспышек сейчас на поле (слабые телефоны: не больше FX_MAX)
 
   // ---------- Разметка ----------
   root.classList.add('m3-root');
@@ -653,10 +713,17 @@ function playLevel(root, ctx, chosen) {
   const themeEl = h('div.m3-theme', `🎁 цель ×2 · ${cfg.moves} ходов`);
   const boardEl = h('div.m3-board');
   const wrap = h('div.m3-wrap', boardEl);
-  const hammerBtn = h('button.btn.m3-hammer', { onclick: onHammer });
-  const bottom = h('div.m3-bottom', hammerBtn);
+  const boosts = BOOSTERS.map((b) => ({ ...b }));
+  const bottom = h('div.m3-bottom.m3-boosts', boosts.map((b) => {
+    b.n = h('span.m3-n');
+    b.btn = h('button.m3-bst', { type: 'button', 'aria-label': b.name }, h('span.m3-bem', b.emoji), b.n);
+    b.btn.addEventListener('pointerdown', (e) => { e.preventDefault(); onBoostBtn(b); });
+    // клавиатура/доступность: click без указателя (detail === 0)
+    b.btn.addEventListener('click', (e) => { if (e.detail === 0) onBoostBtn(b); });
+    return b.btn;
+  }));
   root.append(style, top, goalsEl, themeEl, wrap, bottom);
-  updateHammer();
+  updateBoosts();
 
   function gemEl(type, special) {
     const gem = h('div.m3-gem');
@@ -762,38 +829,44 @@ function playLevel(root, ctx, chosen) {
     b.style.animationDuration = ms + 'ms';
     b.style.setProperty('--rot', (Math.random() * 10 - 5).toFixed(1) + 'deg');
     wrap.append(b);
-    setTimeout(() => b.remove(), ms + 50);
+    drop(b, ms + 50);
   }
 
   function wrapLabel(cls, text, x, y, ms = 900) {
     const t = h('div.' + cls, { style: { left: x + 'px', top: y + 'px' } }, text);
     wrap.append(t);
-    setTimeout(() => t.remove(), ms + 50);
+    drop(t, ms + 50);
   }
 
   function flash(r, c) {
+    if (fxLive >= FX_MAX) return;
+    fxLive++;
     const f = h('div.m3-flash', { style: { left: c * cell - cell * 0.2 + 'px', top: r * cell - cell * 0.2 + 'px', width: cell * 1.4 + 'px', height: cell * 1.4 + 'px' } });
     boardEl.append(f);
-    setTimeout(() => f.remove(), 400);
+    later(() => fxLive--, 400);
+    drop(f, 400);
   }
 
   function burst(r, c, scale = 3) {
     const d = cell * scale;
     const b = h('div.m3-burst', { style: { left: (c + 0.5) * cell - d / 2 + 'px', top: (r + 0.5) * cell - d / 2 + 'px', width: d + 'px', height: d + 'px' } });
     boardEl.append(b);
-    setTimeout(() => b.remove(), 650);
+    drop(b, 650);
   }
 
   function particles(r, c, type, n) {
     const col = type >= 0 ? COLORS[type % COLORS.length] : ['#c8ff2e', '#ff5fa2', '#4fb8ff'];
+    n = Math.min(n, FX_MAX - fxLive);
     for (let i = 0; i < n; i++) {
+      fxLive++;
       const p = h('div.m3-part', { style: { left: c * cell + cell / 2 - 4 + 'px', top: r * cell + cell / 2 - 4 + 'px', background: col[i % col.length] } });
       const ang = Math.random() * Math.PI * 2, dist = cell * (0.6 + Math.random() * 0.9);
       p.style.setProperty('--dx', Math.cos(ang) * dist + 'px');
       p.style.setProperty('--dy', Math.sin(ang) * dist + 'px');
       p.style.setProperty('--rot', Math.random() * 540 + 'deg');
       boardEl.append(p);
-      setTimeout(() => p.remove(), 600);
+      later(() => fxLive--, 600);
+      drop(p, 600);
     }
   }
 
@@ -801,24 +874,29 @@ function playLevel(root, ctx, chosen) {
     boardEl.classList.remove('m3-shake', 'm3-shake2'); void boardEl.offsetWidth;
     const cls = strong ? 'm3-shake2' : 'm3-shake';
     boardEl.classList.add(cls);
-    setTimeout(() => boardEl.classList.remove(cls), strong ? 520 : 370);
+    later(() => boardEl.classList.remove(cls), strong ? 520 : 370);
   }
 
   function effect(e) {
     const full = cell * SIZE;
     if (e.kind === 'row') {
       const b = h('div.m3-beam.m3-h', { style: { left: '0px', top: e.r * cell + cell * 0.28 + 'px', width: full + 'px', height: cell * 0.44 + 'px', transformOrigin: (e.c + 0.5) * cell + 'px 50%' } });
-      boardEl.append(b); setTimeout(() => b.remove(), 500);
+      boardEl.append(b); drop(b, 500);
       shake(false);
     } else if (e.kind === 'col') {
       const b = h('div.m3-beam.m3-v', { style: { top: '0px', left: e.c * cell + cell * 0.28 + 'px', height: full + 'px', width: cell * 0.44 + 'px', transformOrigin: `50% ${(e.r + 0.5) * cell}px` } });
-      boardEl.append(b); setTimeout(() => b.remove(), 500);
+      boardEl.append(b); drop(b, 500);
+      shake(false);
+    } else if (e.kind === 'magnet') {
+      const d = cell * 2.4;
+      const ring = h('div.m3-ring.m3-mag', { style: { left: (e.c + 0.5) * cell - d / 2 + 'px', top: (e.r + 0.5) * cell - d / 2 + 'px', width: d + 'px', height: d + 'px' } });
+      boardEl.append(ring); drop(ring, 550);
       shake(false);
     } else if (e.kind === 'bomb' || e.kind === 'rainbow') {
       const rad = e.kind === 'rainbow' ? 4 : (e.rad || 1) + 0.8;
       const d = cell * rad * 2;
       const ring = h('div.m3-ring' + (e.kind === 'rainbow' ? '.m3-rb' : ''), { style: { left: (e.c + 0.5) * cell - d / 2 + 'px', top: (e.r + 0.5) * cell - d / 2 + 'px', width: d + 'px', height: d + 'px' } });
-      boardEl.append(ring); setTimeout(() => ring.remove(), 550);
+      boardEl.append(ring); drop(ring, 550);
       if ((e.rad || 1) >= 0.5) burst(e.r, e.c, rad * 1.6);
       shake((e.rad || 1) >= 0.5);
     }
@@ -842,7 +920,7 @@ function playLevel(root, ctx, chosen) {
   }
 
   /** Фишки летят из поля в цель; число на цели меняется, когда они долетают */
-  function collect(cleared) {
+  function collect(cleared, maxFly = 4) {
     const per = new Map(); // goal → [cells]
     for (const cl of cleared) {
       if (cl.type < 0) continue;
@@ -857,15 +935,15 @@ function playLevel(root, ctx, chosen) {
       const shown = g.left;
       const gr = g.el.getBoundingClientRect();
       const tx = gr.left + 22, ty = gr.top + gr.height / 2;
-      cells.slice(0, 4).forEach((cl, i) => {
+      cells.slice(0, maxFly).forEach((cl, i) => {
         const from = spos(cl.r, cl.c);
         const f = h('div.m3-fly', { style: { left: from.x - 12 + 'px', top: from.y - 12 + 'px' } }, items[g.type].emoji);
         document.body.append(f);
-        setTimeout(() => {
+        later(() => {
           f.style.transform = `translate(${tx - from.x}px, ${ty - from.y}px) scale(.7)`;
           f.style.opacity = '.4';
         }, 20 + i * 40);
-        setTimeout(() => f.remove(), 520 + i * 40);
+        drop(f, 520 + i * 40);
       });
       later(() => {
         if (shown <= 0) closeGoal(g);
@@ -904,18 +982,19 @@ function playLevel(root, ctx, chosen) {
     else { sfx('tap'); if (st.cleared.length >= 4) buzz(10); }
 
     const many = st.cleared.length > 20;
-    collect(st.cleared);
+    const mag = st.effects.some((e) => e.kind === 'magnet');
+    collect(st.cleared, mag ? 10 : 4);
     let sx = 0, sy = 0;
     for (const cl of st.cleared) {
       const el = els.get(cl.id);
       sx += cl.r; sy += cl.c;
       flash(cl.r, cl.c);
-      particles(cl.r, cl.c, cl.type, many ? 3 : 6);
+      particles(cl.r, cl.c, cl.type, many ? 1 : 3);
       if (el) {
         els.delete(cl.id);
         el.style.zIndex = 3;
         el.classList.add('m3-pop');
-        setTimeout(() => el.remove(), 300);
+        drop(el, 300);
       }
     }
     if (st.cleared.length >= 4) {
@@ -981,31 +1060,109 @@ function playLevel(root, ctx, chosen) {
     }
   }
 
-  function updateHammer() {
-    const n = store.itemCount('МОЛОТОК');
-    hammerBtn.innerHTML = '';
-    hammerBtn.append('🔨 Молоток', h('span.m3-n', n > 0 ? '×' + n : 'нет'));
-    hammerBtn.classList.toggle('m3-empty', n <= 0);
-    if (n <= 0 && hammerMode) setHammer(false);
+  // ---------- Бустеры ----------
+  function updateBoosts() {
+    for (const b of boosts) {
+      const n = store.itemCount(b.id);
+      b.n.textContent = n > 0 ? '×' + n : '0';
+      b.btn.classList.toggle('m3-empty', n <= 0);
+      b.btn.classList.toggle('m3-on', boost === b);
+    }
+    if (boost && store.itemCount(boost.id) <= 0) setBoost(null);
   }
 
-  function setHammer(on) {
-    hammerMode = on;
-    hammerBtn.classList.toggle('m3-on', on);
-    boardEl.classList.toggle('m3-hammering', on);
+  function setBoost(b) {
+    boost = b;
+    for (const x of boosts) x.btn.classList.toggle('m3-on', x === b);
+    boardEl.classList.toggle('m3-hammering', !!b);
   }
 
-  function onHammer() {
-    if (busy || ended) return;
-    if (store.itemCount('МОЛОТОК') <= 0) {
-      sfx('error');
-      toast('Молотка нет. Составь МОЛОТОК в «Эрудите» или найди в «Поиске» (Кабинет)', 3200);
+  function onBoostBtn(b) {
+    if (!alive || ended) return;
+    if (store.itemCount(b.id) <= 0) {
+      sfx('error'); buzz(20);
+      toast(`Нет ${b.gen}. Собери слово ${b.id} в Эрудите`, 2600);
       return;
     }
-    sfx('tap');
+    if (busy) return;
+    sfx('tap'); buzz(6);
     setSel(null);
-    setHammer(!hammerMode);
-    if (hammerMode) toast('Тапни по фишке, чтобы разбить её 🔨');
+    if (!b.target) { setBoost(null); useBooster(b, null); return; }
+    if (boost === b) { setBoost(null); return; } // повторный тап — отмена
+    setBoost(b);
+    toast(b.hint, 1600);
+  }
+
+  async function useBooster(b, rc) {
+    if (busy || ended) return;
+    if (rc && !board.get(rc[0], rc[1])) return;
+    if (!store.removeItem(b.id)) { updateBoosts(); return; }
+    clearHint();
+    busy = true;
+    setBoost(null);
+    setSel(null);
+    updateBoosts();
+    if (b.id === 'КОМПАС') {
+      sfx('coin'); buzz([15, 30, 15]);
+      banner('Перемешиваем! 🧭', 'm3-c1', 1000);
+      board.reshuffle();
+      await carousel();
+      if (!alive) return;
+      await afterTurn();
+      return;
+    }
+    const [r, c] = rc;
+    const t = board.get(r, c);
+    const el = els.get(t.id);
+    if (el) { el.classList.add('m3-sel'); await wait(120); if (!alive) return; el.classList.remove('m3-sel'); }
+    let res = null;
+    if (b.id === 'МОЛОТОК') {
+      effect({ kind: 'bomb', r, c, rad: 0.2 });
+      sfx('coin'); buzz(20);
+      res = board.hammer(r, c);
+    } else if (b.id === 'БОМБА') {
+      res = board.bomb3(r, c);
+    } else if (b.id === 'НОЖНИЦЫ') {
+      res = board.clearRow(r, c);
+    } else if (b.id === 'ТОПОР') {
+      res = board.clearCol(c, r);
+    } else if (b.id === 'МАГНИТ') {
+      res = board.magnet(r, c);
+      sfx('coin'); buzz([10, 20, 10]);
+      // фишки притягиваются к магниту, потом улетают в цель
+      const tx = c, ty = r;
+      for (const cl of res.steps[0].cleared) {
+        const e2 = els.get(cl.id);
+        if (e2 && (cl.r !== r || cl.c !== c)) setPos(e2, cl.r + (ty - cl.r) * 0.55, cl.c + (tx - cl.c) * 0.55, 230, 'cubic-bezier(.5,0,.8,.6)');
+      }
+      await wait(240);
+      if (!alive) return;
+    }
+    if (res) await playResult(res);
+    if (!alive) return;
+    await afterTurn();
+  }
+
+  /** Компас: фишки взлетают в карусель вокруг центра поля и раскладываются по новым местам */
+  async function carousel() {
+    const half = (SIZE * cell) / 2, R = half * 0.62;
+    const list = [...els.values()];
+    list.forEach((el, i) => {
+      const ang = (i / list.length) * Math.PI * 2;
+      el.style.transition = `transform 300ms cubic-bezier(.5,0,.3,1)`;
+      el.style.transform = `translate(${half - cell / 2 + Math.cos(ang) * R}px, ${half - cell / 2 + Math.sin(ang) * R}px) rotate(${Math.round(ang * 57)}deg) scale(.7)`;
+    });
+    await wait(320);
+    if (!alive) return;
+    list.forEach((el, i) => {
+      const ang = (i / list.length) * Math.PI * 2 + 1.6;
+      el.style.transition = `transform 320ms linear`;
+      el.style.transform = `translate(${half - cell / 2 + Math.cos(ang) * R}px, ${half - cell / 2 + Math.sin(ang) * R}px) rotate(${Math.round(ang * 57 + 90)}deg) scale(.7)`;
+    });
+    await wait(330);
+    if (!alive) return;
+    syncAll(420);
+    await wait(440);
   }
 
   function setSel(rc) {
@@ -1044,25 +1201,6 @@ function playLevel(root, ctx, chosen) {
     elA.style.zIndex = '';
     movesLeft--;
     updateMoves(true);
-    await playResult(res);
-    if (!alive) return;
-    await afterTurn();
-  }
-
-  async function doHammer(r, c) {
-    if (busy || ended) return;
-    if (!board.get(r, c)) return;
-    if (!store.removeItem('МОЛОТОК')) { updateHammer(); return; }
-    clearHint();
-    busy = true;
-    setHammer(false);
-    updateHammer();
-    const t = board.get(r, c);
-    const el = els.get(t.id);
-    if (el) { el.classList.add('m3-sel'); await wait(150); }
-    effect({ kind: 'bomb', r, c, rad: 0.2 });
-    sfx('coin'); buzz(20);
-    const res = board.hammer(r, c);
     await playResult(res);
     if (!alive) return;
     await afterTurn();
@@ -1120,7 +1258,7 @@ function playLevel(root, ctx, chosen) {
     await wait(1600);
     if (!alive) return;
     winEl.classList.add('m3-out');
-    setTimeout(() => winEl.remove(), 320);
+    drop(winEl, 320);
     if (movesLeft > 0) {
       banner('Финальный салют! 🎆', 'm3-c1', 1200);
       await wait(700);
@@ -1188,17 +1326,27 @@ function playLevel(root, ctx, chosen) {
     if (r < 0 || c < 0 || r >= SIZE || c >= SIZE) return null;
     return [r, c];
   }
+  // Всё решается на pointerdown: выбор, обмен с выделенной соседней, бустер.
+  // Свайп добирается в pointermove. pointerup только снимает выделение повторным тапом.
   function onDown(e) {
-    if (busy || ended) return;
+    if (ended || busy) return;
     const rc = cellAt(e);
     if (!rc) return;
-    down = { r: rc[0], c: rc[1], x: e.clientX, y: e.clientY, used: false, id: e.pointerId };
+    e.preventDefault();
+    if (boost) { useBooster(boost, rc); return; }
+    down = { r: rc[0], c: rc[1], x: e.clientX, y: e.clientY, used: false, id: e.pointerId, again: false };
     try { boardEl.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    if (sel) {
+      if (sel[0] === rc[0] && sel[1] === rc[1]) { down.again = true; return; }
+      if (Math.abs(sel[0] - rc[0]) + Math.abs(sel[1] - rc[1]) === 1) { down.used = true; doMove(sel, rc); return; }
+    }
+    sfx('tap');
+    setSel(rc);
   }
   function onMove(e) {
-    if (!down || down.used || down.id !== e.pointerId || hammerMode) return;
+    if (!down || down.used || down.id !== e.pointerId || boost) return;
     const dx = e.clientX - down.x, dy = e.clientY - down.y;
-    if (Math.max(Math.abs(dx), Math.abs(dy)) < 15) return;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 12) return;
     down.used = true;
     const [dr, dc] = Math.abs(dx) > Math.abs(dy) ? [0, Math.sign(dx)] : [Math.sign(dy), 0];
     const b = [down.r + dr, down.c + dc];
@@ -1209,15 +1357,7 @@ function playLevel(root, ctx, chosen) {
     if (!down || down.id !== e.pointerId) return;
     const d = down;
     down = null;
-    if (d.used || busy || ended) return;
-    const rc = [d.r, d.c];
-    if (hammerMode) { doHammer(rc[0], rc[1]); return; }
-    if (sel) {
-      if (sel[0] === rc[0] && sel[1] === rc[1]) { setSel(null); return; }
-      if (Math.abs(sel[0] - rc[0]) + Math.abs(sel[1] - rc[1]) === 1) { doMove(sel, rc); return; }
-    }
-    sfx('tap');
-    setSel(rc);
+    if (!d.used && d.again && !busy) setSel(null);
   }
   const onCancel = () => { down = null; };
   boardEl.addEventListener('pointerdown', onDown);

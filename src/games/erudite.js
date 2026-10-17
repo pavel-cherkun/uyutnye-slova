@@ -2,7 +2,9 @@
 // или открывает комнату. Буквы тратятся.
 
 import { h, toast, confetti, pick, modal } from '../ui/common.js';
-import { classifyWord, getItem, ITEMS, ROOMS, CATEGORIES, RARITY, RARITY_ORDER } from '../data/items.js';
+import { classifyWord, getItem, ITEMS, CATEGORIES, RARITY, RARITY_ORDER } from '../data/items.js';
+import { PLACES, placeForWord, unlockPlace, openPlaces } from '../data/places.js';
+import { dictReady, loadDict } from '../data/dict.js';
 import { CARD_WORDS, ESSENCE_WORDS } from '../data/words.js';
 import { ALPHABET, isLetterOpen, randomLetter } from '../data/letters.js';
 import { dictWords, dictCat } from '../data/dict.js';
@@ -26,7 +28,7 @@ const RAR_LEN = { r: 5, e: 7, l: 9 };
 let ALL_WORDS = null;
 function allWords() {
   if (!ALL_WORDS) ALL_WORDS = [...new Set([
-    ...ROOMS.map((r) => r.word), ...ITEMS.map((i) => i.word), ...Object.keys(CARD_WORDS), ...ESSENCE_WORDS, ...dictWords(),
+    ...PLACES.map((p) => p.word), ...ITEMS.map((i) => i.word), ...Object.keys(CARD_WORDS), ...ESSENCE_WORDS, ...dictWords(),
   ])];
   return ALL_WORDS;
 }
@@ -105,6 +107,8 @@ const CSS = `
 .er-made { display: flex; gap: 6px; overflow-x: auto; padding: 4px 2px 6px; min-height: 40px; }
 .er-made .chip { flex: none; animation: er-in .35s cubic-bezier(.3,1.8,.6,1); background: #fff; }
 
+.er-place { margin-top: 6px; font-weight: 900; font-size: 13px; color: var(--ink); background: var(--yellow); border: 2px solid var(--ink); border-radius: 99px; padding: 3px 10px; display: inline-block; }
+.er-flash i { display: block; font-style: normal; font-weight: 900; font-size: 16px; color: #fff; text-align: center; margin-top: 6px; text-shadow: 0 2px 0 #111; }
 .er-flash { position: fixed; inset: 0; z-index: 320; display: flex; align-items: center; justify-content: center; pointer-events: none; animation: er-fl 1.6s forwards;
   background: radial-gradient(circle, color-mix(in srgb, var(--rar) 65%, transparent), transparent 72%); }
 .er-flash::before { content: ''; position: absolute; width: 160vmax; height: 160vmax; left: 50%; top: 50%; margin: -80vmax 0 0 -80vmax;
@@ -131,6 +135,7 @@ const CSS = `
 @keyframes er-mini { from { transform: scale(.96); opacity: 1; } to { transform: scale(1.08); opacity: 0; } }
 @keyframes er-minit { 0% { transform: translate(-50%, 10px) scale(.4); opacity: 0; } 25% { transform: translate(-50%, -4px) scale(1.15); opacity: 1; } 75% { opacity: 1; } 100% { transform: translate(-50%, -18px) scale(1); opacity: 0; } }
 @keyframes er-pulse { 50% { transform: translateY(-2px) scale(1.04); box-shadow: 0 7px 0 var(--ink), 0 0 0 5px color-mix(in srgb, var(--lime) 55%, transparent); } }
+.er-flash { flex-direction: column; }
 @keyframes er-fl { 75% { opacity: 1; } to { opacity: 0; } }
 @keyframes er-flpop { from { transform: scale(.2) rotate(-14deg); opacity: 0; } 60% { transform: scale(1.15) rotate(-4deg); } }
 @keyframes er-spin { to { transform: rotate(360deg); } }
@@ -253,6 +258,9 @@ export function mount(root, ctx) {
         const label = TOOL_USE[c.id] ? '🔨 инструмент' : c.kind === 'item' ? '🎁' : c.kind === 'card' ? CATEGORIES[it.cat].name.toLowerCase() : '✨ в печь';
         // редкость видна до того, как слово составлено — тянет собирать слова подлиннее
         previewEl.append(h('span', `${it.emoji} ${label}`), h('span.rar-tag.rar-' + it.rarity, RARITY[it.rarity].name));
+        // слово-место открывает новую локацию в «Поиске»
+        const pl = placeForWord(w);
+        if (pl && !openPlaces(state).includes(pl)) previewEl.append(h('div.er-place', `${pl.icon} откроет место в Поиске!`));
         // у карточек и эссенций редкость зависит от длины — подсказываем, сколько ещё до следующей
         if (c.kind !== 'item' && it.rarity !== 'l') {
           const nx = RARITY_ORDER[RARITY_ORDER.indexOf(it.rarity) + 1];
@@ -335,6 +343,7 @@ export function mount(root, ctx) {
     const w = word.join('');
     const c = classifyWord(w);
     if (c.kind === 'invalid') {
+      if (!dictReady()) { toast('Словарь ещё загружается — попробуй через пару секунд'); loadDict(); return; }
       wordEl.classList.remove('shake'); void wordEl.offsetWidth; wordEl.classList.add('shake');
       sfx('error'); buzz([30, 40, 30]);
       return;
@@ -369,7 +378,15 @@ export function mount(root, ctx) {
       confetti(innerWidth / 2, innerHeight / 3, rar === 'l' ? 90 : 50);
     }
     const br = wordEl.getBoundingClientRect();
-    gainXP((c.kind === 'room' ? 40 : WORD_XP[rar]) * (first ? 2 : 1), { x: br.left + br.width / 2, y: br.top });
+    let xp = (c.kind === 'room' ? 40 : WORD_XP[rar]) * (first ? 2 : 1);
+    if (unlockPlace(state, w)) {
+      const pl = placeForWord(w);
+      const flash = h('div.er-flash.rar-l', h('b', `${pl.icon} ${pl.word}!`), h('i', 'новое место в Поиске'));
+      document.body.append(flash); later(() => flash.remove(), 1800);
+      confetti(innerWidth / 2, innerHeight / 3, 60);
+      xp += 30;
+    }
+    gainXP(xp, { x: br.left + br.width / 2, y: br.top });
     word = [];
     topRank = -1; lastLen = 0;
     store.commit();
