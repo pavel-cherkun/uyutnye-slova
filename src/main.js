@@ -51,7 +51,7 @@ function boot() {
 let prevHud = {};
 function renderHud() {
   if (!hudEl) return;
-  const vals = { energy: state.energy, coins: state.coins, keys: state.keys, letters: totalLetters() };
+  const vals = { energy: state.energy, keys: state.keys, letters: totalLetters() };
   const pill = (k, ic, title) => {
     const el = h('div.hud-pill', { title }, ic === 'L' ? h('span.ltr', 'А') : h('span.ic', ic), vals[k]);
     if (prevHud[k] != null && prevHud[k] !== vals[k]) el.classList.add('bump');
@@ -60,7 +60,6 @@ function renderHud() {
   hudEl.replaceChildren(
     h('button.hud-avatar', { style: { border: 0, padding: 0 }, onclick: () => go('me'), html: avatarSVG(state.profile) }),
     pill('energy', '⚡', 'Энергия'),
-    pill('coins', '🪙', 'Монеты'),
     pill('keys', '🗝️', 'Ключи'),
     pill('letters', 'L', 'Буквы'),
     h('div.hud-spacer'),

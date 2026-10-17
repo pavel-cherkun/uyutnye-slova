@@ -24,7 +24,6 @@ function defaultState() {
       outfitColor: 0,
     },
     energy: 25,
-    coins: 30,
     keys: 0,
     letters: {},          // { 'А': 3, ... }
     items: {},            // { 'ЯБЛОКО': 2, 'card:СЕКРЕТЕР': 1, 'ess:ЛЮБОВЬ': 1 }
@@ -53,6 +52,7 @@ function migrate(s) {
   for (const k of ['profile', 'oven', 'progress', 'stats', 'settings']) out[k] = { ...d[k], ...(s[k] || {}) };
   // старые сохранения: алфавит уже был открыт целиком
   if (s.created && (s.progress || {}).letterStage === undefined) out.progress.letterStage = 99;
+  delete out.coins; // монеты убраны из игры
   out.version = SAVE_VERSION;
   return out;
 }
@@ -188,11 +188,6 @@ export function spendEnergy(n) {
   if (state.energy < n) return false;
   state.energy -= n; commit(); return true;
 }
-export function addCoins(n) { state.coins += n; commit(); }
-export function spendCoins(n) {
-  if (state.coins < n) return false;
-  state.coins -= n; commit(); return true;
-}
 export function addKeys(n) { state.keys += n; commit(); }
 export function spendKeys(n) {
   if (state.keys < n) return false;
@@ -201,7 +196,7 @@ export function spendKeys(n) {
 
 /**
  * Применить награду целиком.
- * reward: { items?: {id:n}, letters?: string|{ch:n}, energy?, coins?, keys? }
+ * reward: { items?: {id:n}, letters?: string|{ch:n}, energy?, keys? }
  */
 export function applyReward(reward = {}) {
   if (reward.items) for (const [id, n] of Object.entries(reward.items)) state.items[id] = (state.items[id] || 0) + n;
@@ -210,7 +205,6 @@ export function applyReward(reward = {}) {
     for (const [ch, n] of Object.entries(map)) state.letters[ch] = (state.letters[ch] || 0) + n;
   }
   if (reward.energy) state.energy = Math.min(MAX_ENERGY, state.energy + reward.energy);
-  if (reward.coins) state.coins += reward.coins;
   if (reward.keys) state.keys += reward.keys;
   commit();
 }
