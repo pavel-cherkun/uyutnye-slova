@@ -66,7 +66,6 @@ export function itemChip(id, n) {
 export function rewardChips(reward = {}) {
   const out = [];
   if (reward.energy) out.push(h('div.chip', h('span.chip-emoji', '⚡'), h('span.chip-word', 'энергия'), h('span.chip-n', '+' + reward.energy)));
-  if (reward.coins) out.push(h('div.chip', h('span.chip-emoji', '🪙'), h('span.chip-word', 'монеты'), h('span.chip-n', '+' + reward.coins)));
   if (reward.keys) out.push(h('div.chip', h('span.chip-emoji', '🗝️'), h('span.chip-word', 'ключи'), h('span.chip-n', '+' + reward.keys)));
   if (reward.letters) {
     const str = typeof reward.letters === 'string'
