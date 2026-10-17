@@ -2,6 +2,8 @@
 
 import { ITEMS, itemsByCat } from '../data/items.js';
 import { h, toast, confetti, shuffle, pick, confirmDialog } from '../ui/common.js';
+import { floatText } from '../ui/fx.js';
+import { sfx, buzz } from '../ui/device.js';
 
 export const meta = {
   id: 'hidden',
@@ -12,19 +14,20 @@ export const meta = {
   gives: 'предметы',
 };
 
+// tile — цвет плитки на экране выбора; bg — фон сцены
 export const LOCATIONS = [
-  { id: 'kitchen',    name: 'Кухня',    icon: '🍳', keys: 0, cats: ['dishes', 'food', 'drinks'],
-    bg: 'linear-gradient(150deg, #ffe08a 0%, #ff9f6b 50%, #ff6f91 100%)' },
-  { id: 'garden',     name: 'Сад',      icon: '🌻', keys: 1, cats: ['plants', 'nature'],
-    bg: 'linear-gradient(160deg, #b8f5a0 0%, #4fd1a5 50%, #3fa9ff 100%)' },
-  { id: 'wardrobe',   name: 'Гардероб', icon: '👗', keys: 2, cats: ['clothes', 'accessory'],
-    bg: 'linear-gradient(150deg, #ffc2e2 0%, #ff6fb5 45%, #a66bff 100%)' },
-  { id: 'attic',      name: 'Чердак',   icon: '🕯️', keys: 3, cats: ['decor', 'music', 'transport', 'fantasy'],
-    bg: 'linear-gradient(160deg, #f5c78a 0%, #c0794a 45%, #6b3fa0 100%)' },
-  { id: 'office',     name: 'Кабинет',  icon: '🖋️', keys: 3, cats: ['stationery', 'tech', 'tools'],
-    bg: 'linear-gradient(150deg, #a8e6ff 0%, #6c8cff 50%, #7a5cff 100%)' },
-  { id: 'livingroom', name: 'Гостиная', icon: '🛋️', keys: 4, cats: ['furniture', 'light', 'walldecor', 'pets'],
-    bg: 'linear-gradient(160deg, #fff1a8 0%, #ffb36b 40%, #ff5f8f 75%, #9a5cff 100%)' },
+  { id: 'kitchen',    name: 'Кухня',    icon: '🍳', keys: 0, cats: ['dishes', 'food', 'drinks'], tile: 'var(--orange)',
+    bg: 'linear-gradient(150deg, #ffe36b 0%, #ffab5e 55%, #ff7aa8 100%)' },
+  { id: 'garden',     name: 'Сад',      icon: '🌻', keys: 1, cats: ['plants', 'nature'], tile: 'var(--lime)',
+    bg: 'linear-gradient(160deg, #e2ff8a 0%, #7fe3a8 50%, #66c7ff 100%)' },
+  { id: 'wardrobe',   name: 'Гардероб', icon: '👗', keys: 2, cats: ['clothes', 'accessory'], tile: 'var(--pink)',
+    bg: 'linear-gradient(150deg, #ffd0e8 0%, #ff8cc4 45%, #b49bff 100%)' },
+  { id: 'attic',      name: 'Чердак',   icon: '🕯️', keys: 3, cats: ['decor', 'music', 'transport', 'fantasy'], tile: 'var(--yellow)',
+    bg: 'linear-gradient(160deg, #ffe0a0 0%, #e0a070 45%, #9b7bff 100%)' },
+  { id: 'office',     name: 'Кабинет',  icon: '🖋️', keys: 3, cats: ['stationery', 'tech', 'tools'], tile: 'var(--blue)',
+    bg: 'linear-gradient(150deg, #c4efff 0%, #85b4ff 50%, #9c8bff 100%)' },
+  { id: 'livingroom', name: 'Гостиная', icon: '🛋️', keys: 4, cats: ['furniture', 'light', 'walldecor', 'pets'], tile: 'var(--violet)',
+    bg: 'linear-gradient(160deg, #fff4a8 0%, #ffbf7a 40%, #ff7aa8 75%, #a98bff 100%)' },
 ];
 
 const TIME = 90;          // секунд на сцену
@@ -33,86 +36,152 @@ const TARGETS = 7;
 const SCENE_MIN = 45, SCENE_MAX = 60;
 const HINT_COST = 3; // энергии, если нет лупы
 const HIT_PAD = 8;        // запас хитбокса, px
+const STREAK_WINDOW = 3000; // мс между находками, чтобы серия продолжалась
+const STREAK_BONUS = 3;     // секунд за находку в серии ×3+
+const LOW_TIME = 10;        // последние секунды: пульс и тиканье
 
-const BLOB_COLORS = ['#ffffff', '#ffc93c', '#ff4f8b', '#3fa9ff', '#2fcf98', '#a66bff', '#ff8a3d'];
+const BLOB_COLORS = ['#ffffff', '#ffd60a', '#ff5fa2', '#4fb8ff', '#c8ff2e', '#8c7bff', '#ff7a1a'];
 
 const rnd = (a, b) => a + Math.random() * (b - a);
 const normEmoji = (e) => e.replace(/️/g, '');
 const cap = (w) => w.charAt(0) + w.slice(1).toLowerCase();
 
 const CSS = `
-.ho-root { position:absolute; inset:0; display:flex; flex-direction:column; overflow:hidden; }
-.ho-top .game-title { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.ho-keys { font-weight:900; background:rgba(255,255,255,.9); border-radius:999px; padding:6px 12px; box-shadow:0 3px 0 rgba(43,29,74,.12); white-space:nowrap; }
-.ho-timer { font-weight:900; font-size:16px; min-width:52px; text-align:center; background:rgba(255,255,255,.9); border-radius:999px; padding:6px 10px; box-shadow:0 3px 0 rgba(43,29,74,.12); font-variant-numeric:tabular-nums; }
-.ho-timer.low { color:#fff; background:var(--pink); animation:ho-throb .5s infinite alternate; }
-@keyframes ho-throb { to { transform:scale(1.12); } }
+.ho-root { position:absolute; inset:0; display:flex; flex-direction:column; overflow:hidden; background:var(--paper);
+  background-image:radial-gradient(rgba(17,17,17,.07) 1.2px, transparent 1.3px); background-size:18px 18px; color:var(--ink); }
+.ho-top .game-title { font-family:var(--display); font-weight:800; font-size:17px; letter-spacing:-.5px; text-transform:uppercase;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ho-pill { font-family:var(--display); font-weight:800; font-size:14px; background:#fff; border:2.5px solid var(--ink); border-radius:999px;
+  padding:5px 11px; box-shadow:0 3px 0 var(--ink); white-space:nowrap; font-variant-numeric:tabular-nums; }
+.ho-pill.bump { animation:ho-bump .45s cubic-bezier(.3,1.8,.5,1); }
 
-/* выбор локации */
-.ho-select { flex:1; overflow-y:auto; padding:4px 14px calc(16px + var(--safe-bottom)); }
-.ho-sel-title { font-size:24px; font-weight:900; margin:4px 2px 4px; }
-.ho-sel-sub { margin:0 2px 12px; }
-.ho-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-.ho-loc { position:relative; border:0; border-radius:22px; min-height:128px; padding:12px; color:#fff; text-align:left;
-  display:flex; flex-direction:column; justify-content:flex-end; box-shadow:0 6px 0 rgba(43,29,74,.18); overflow:hidden; cursor:pointer;
-  transition:transform .1s; animation:ho-in .4s cubic-bezier(.3,1.6,.6,1) backwards; }
-.ho-loc:active { transform:scale(.96); }
-.ho-loc-ic { position:absolute; right:-6px; top:-6px; font-size:66px; transform:rotate(12deg); filter:drop-shadow(0 4px 4px rgba(0,0,0,.2)); }
-.ho-loc-name { font-size:19px; font-weight:900; text-shadow:0 2px 0 rgba(0,0,0,.25); }
-.ho-loc-info { font-size:12px; font-weight:800; opacity:.95; text-shadow:0 1px 0 rgba(0,0,0,.25); }
-.ho-loc.locked .ho-loc-ic { filter:grayscale(.7) brightness(.8); }
-.ho-loc.locked::after { content:''; position:absolute; inset:0; background:rgba(43,29,74,.35); }
-.ho-lock { position:absolute; z-index:2; left:50%; top:42%; transform:translate(-50%,-50%); background:#fff; color:var(--ink);
-  font-weight:900; border-radius:999px; padding:6px 12px; font-size:15px; box-shadow:0 4px 0 rgba(43,29,74,.2); white-space:nowrap; }
-.ho-loc .ho-loc-name, .ho-loc .ho-loc-info { position:relative; z-index:2; }
+/* ---------- выбор локации ---------- */
+.ho-select { flex:1; overflow-y:auto; padding:4px 16px calc(20px + var(--safe-bottom)); }
+.ho-sel-title { font-family:var(--display); font-size:28px; font-weight:900; letter-spacing:-1px; text-transform:uppercase; margin:6px 2px 2px; }
+.ho-sel-sub { display:flex; gap:6px; flex-wrap:wrap; margin:6px 0 16px; }
+.ho-tag { font-weight:900; font-size:12px; background:#fff; border:2px solid var(--ink); border-radius:999px; padding:3px 10px; }
+.ho-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.ho-loc { position:relative; border:3px solid var(--ink); border-radius:28px; min-height:150px; padding:14px; color:var(--ink); text-align:left;
+  display:flex; flex-direction:column; justify-content:flex-end; gap:6px; box-shadow:0 6px 0 var(--ink); overflow:hidden; cursor:pointer;
+  font:inherit; animation:ho-in .45s cubic-bezier(.2,1.5,.4,1) backwards; }
+.ho-loc::before { content:''; position:absolute; inset:0; background:radial-gradient(circle at 30% 20%, rgba(255,255,255,.5), transparent 55%); pointer-events:none; }
+.ho-loc:active { transform:translateY(4px) scale(.98); box-shadow:0 2px 0 var(--ink); }
+.ho-loc-ic { position:absolute; right:-4px; top:-4px; font-size:70px; line-height:1; transform:rotate(12deg); filter:drop-shadow(0 4px 0 rgba(17,17,17,.25)); }
+.ho-loc:not(.locked) .ho-loc-ic { animation:ho-bob 2.6s ease-in-out infinite; }
+.ho-loc:nth-child(2n) .ho-loc-ic { animation-delay:-1.1s; }
+.ho-loc-name { position:relative; z-index:2; font-family:var(--display); font-size:17px; font-weight:900; letter-spacing:-.5px; text-transform:uppercase; }
+.ho-loc-go { position:relative; z-index:2; align-self:flex-start; font-family:var(--display); font-weight:800; font-size:11px; text-transform:uppercase;
+  background:var(--ink); color:var(--lime); border-radius:999px; padding:4px 10px; letter-spacing:.5px; }
+.ho-loc.locked::after { content:''; position:absolute; inset:0; pointer-events:none; z-index:1;
+  background:repeating-linear-gradient(-45deg, rgba(243,242,234,.62) 0 12px, rgba(243,242,234,.42) 12px 24px); }
+.ho-loc.locked.can::after { background:repeating-linear-gradient(-45deg, rgba(255,255,255,.18) 0 12px, transparent 12px 24px); }
+.ho-loc.locked .ho-loc-ic { filter:grayscale(.6) opacity(.75); }
+.ho-loc.locked.can .ho-loc-ic { filter:none; }
+.ho-loc.locked.can { animation:ho-in .45s cubic-bezier(.2,1.5,.4,1) backwards, ho-wiggle 2.2s 1s ease-in-out infinite; }
+.ho-lock { position:relative; z-index:2; align-self:flex-start; display:flex; align-items:center; gap:4px; background:#fff; color:var(--ink);
+  font-family:var(--display); font-weight:800; border:2.5px solid var(--ink); border-radius:999px; padding:4px 10px; font-size:14px; box-shadow:0 3px 0 var(--ink); }
+.ho-loc.can .ho-lock { background:var(--lime); }
 .ho-loc.shake { animation:ho-shake .4s; }
 @keyframes ho-shake { 20%,60% { transform:translateX(-6px); } 40%,80% { transform:translateX(6px); } }
 @keyframes ho-in { from { transform:scale(.6); opacity:0; } }
+@keyframes ho-bob { 50% { transform:rotate(4deg) translateY(-6px); } }
+@keyframes ho-wiggle { 0%,85%,100% { transform:none; } 90% { transform:rotate(-2deg); } 95% { transform:rotate(2deg); } }
 
-/* игра */
-.ho-bar { height:10px; margin:0 12px 8px; border-radius:999px; background:rgba(255,255,255,.6); overflow:hidden; box-shadow:inset 0 2px 3px rgba(0,0,0,.1); flex:none; }
-.ho-bar-fill { height:100%; width:100%; border-radius:999px; background:linear-gradient(90deg, var(--green), var(--yellow), var(--orange)); transform-origin:left; transition:background .3s; }
-.ho-bar-fill.low { background:linear-gradient(90deg, var(--pink), var(--orange)); }
-.ho-scene { position:relative; flex:1; min-height:0; margin:0 10px; border-radius:22px; overflow:hidden;
-  box-shadow:inset 0 0 0 4px rgba(255,255,255,.7), 0 6px 0 rgba(43,29,74,.15); touch-action:none; }
+/* ---------- таймер-полоска ---------- */
+.ho-time { position:relative; flex:none; height:30px; margin:0 12px 10px; border:2.5px solid var(--ink); border-radius:999px; background:#fff;
+  box-shadow:0 3px 0 var(--ink); overflow:hidden; }
+.ho-time-fill { position:absolute; left:0; top:0; bottom:0; width:100%; border-right:2.5px solid var(--ink);
+  background:repeating-linear-gradient(-45deg, var(--lime) 0 10px, #b5f000 10px 20px); background-size:28.28px 28.28px;
+  animation:ho-stripes 1s linear infinite; transition:width .15s linear; }
+.ho-time-num { position:absolute; inset:0; display:flex; align-items:center; padding-left:12px; font-family:var(--display); font-weight:800;
+  font-size:15px; font-variant-numeric:tabular-nums; }
+.ho-time.low .ho-time-fill { background:repeating-linear-gradient(-45deg, var(--pink) 0 10px, #ff3d8c 10px 20px); background-size:28.28px 28.28px; }
+.ho-time.low { animation:ho-throb .5s ease-in-out infinite alternate; }
+.ho-time.low .ho-time-num { color:#fff; text-shadow:0 2px 0 var(--ink); }
+.ho-time.plus { animation:ho-bump .5s cubic-bezier(.3,1.8,.5,1); }
+.ho-time.minus { animation:ho-shake .35s; }
+@keyframes ho-stripes { to { background-position:28.28px 0; } }
+@keyframes ho-throb { to { transform:scale(1.04); box-shadow:0 3px 0 var(--ink), 0 0 0 4px rgba(255,95,162,.35); } }
+@keyframes ho-bump { 40% { transform:scale(1.15) rotate(-2deg); } }
+
+/* ---------- сцена ---------- */
+.ho-scene { position:relative; flex:1; min-height:0; margin:0 12px; border:3px solid var(--ink); border-radius:26px; overflow:hidden;
+  box-shadow:0 5px 0 var(--ink); touch-action:none; }
+.ho-scene::after { content:''; position:absolute; inset:0; pointer-events:none; z-index:450; border-radius:22px;
+  background-image:radial-gradient(rgba(17,17,17,.08) 1.2px, transparent 1.3px); background-size:16px 16px; }
 .ho-blob { position:absolute; border-radius:50%; pointer-events:none; }
 .ho-it { position:absolute; line-height:1; transform:translate(-50%,-50%) rotate(var(--r)); padding:2px;
-  filter:drop-shadow(0 3px 2px rgba(43,29,74,.35)); transition:opacity .2s; }
-.ho-it.found { animation:ho-boing .45s cubic-bezier(.3,1.8,.6,1) forwards; }
+  filter:drop-shadow(0 3px 0 rgba(17,17,17,.28)); transition:opacity .2s; }
+.ho-it.found { animation:ho-boing .5s cubic-bezier(.3,1.8,.6,1) forwards; }
 @keyframes ho-boing { 0% { transform:translate(-50%,-50%) rotate(var(--r)) scale(1); }
-  50% { transform:translate(-50%,-50%) rotate(0) scale(1.6); } 100% { transform:translate(-50%,-50%) rotate(0) scale(0); opacity:0; } }
+  35% { transform:translate(-50%,-50%) rotate(0) scale(1.75); } 55% { transform:translate(-50%,-50%) rotate(0) scale(1.35); }
+  100% { transform:translate(-50%,-50%) rotate(0) scale(0); opacity:0; } }
+.ho-burst { position:absolute; pointer-events:none; z-index:502; width:20px; height:20px; margin:-10px 0 0 -10px; border-radius:50%;
+  border:4px solid var(--ink); background:var(--lime); animation:ho-burst .5s ease-out forwards; }
+.ho-burst.b2 { background:transparent; border-color:#fff; animation-delay:.08s; animation-fill-mode:both; }
+@keyframes ho-burst { from { transform:scale(.3); opacity:1; } to { transform:scale(5); opacity:0; border-width:1px; } }
 .ho-fly { position:fixed; z-index:120; pointer-events:none; line-height:1; transform:translate(-50%,-50%);
-  transition:left .6s cubic-bezier(.5,-0.4,.6,1), top .6s cubic-bezier(.3,0,.4,1.3), font-size .6s, opacity .2s .55s;
-  filter:drop-shadow(0 4px 4px rgba(0,0,0,.3)); }
-.ho-miss { position:absolute; width:56px; height:56px; margin:-28px 0 0 -28px; border-radius:50%; pointer-events:none;
-  background:radial-gradient(circle, rgba(255,40,80,.85) 0%, rgba(255,40,80,.35) 50%, transparent 70%); animation:ho-miss .5s ease-out forwards; z-index:500; }
-@keyframes ho-miss { from { transform:scale(.3); } to { transform:scale(1.6); opacity:0; } }
-.ho-minus { position:absolute; pointer-events:none; font-weight:900; font-size:20px; color:#fff; z-index:501;
-  text-shadow:0 2px 0 #c92e66, 0 0 6px #ff2850; transform:translate(-50%,-50%); animation:ho-up .8s ease-out forwards; }
-@keyframes ho-up { to { transform:translate(-50%,-160%); opacity:0; } }
-.ho-spark { position:absolute; width:9px; height:9px; border-radius:50%; pointer-events:none; z-index:502;
-  animation:ho-spark .6s ease-out forwards; }
-@keyframes ho-spark { to { transform:translate(var(--dx), var(--dy)) scale(.2); opacity:0; } }
+  transition:left .55s cubic-bezier(.5,-0.4,.6,1), top .55s cubic-bezier(.3,0,.4,1.3), font-size .55s, opacity .15s .5s;
+  filter:drop-shadow(0 3px 0 rgba(17,17,17,.35)); }
+.ho-miss { position:absolute; width:56px; height:56px; margin:-28px 0 0 -28px; border-radius:50%; pointer-events:none; z-index:500;
+  border:3px solid var(--ink); background:rgba(255,95,162,.55); animation:ho-miss .5s ease-out forwards; }
+@keyframes ho-miss { from { transform:scale(.3); } to { transform:scale(1.5); opacity:0; } }
+.ho-minus { position:absolute; pointer-events:none; z-index:501; font-family:var(--display); font-weight:800; font-size:15px; color:#fff;
+  background:var(--pink); border:2.5px solid var(--ink); border-radius:999px; padding:2px 9px; box-shadow:0 3px 0 var(--ink); white-space:nowrap;
+  transform:translate(-50%,-50%); animation:ho-up .85s ease-out forwards; }
+@keyframes ho-up { 0% { transform:translate(-50%,-50%) scale(.5); } 20% { transform:translate(-50%,-80%) scale(1.15); }
+  100% { transform:translate(-50%,-190%) scale(1); opacity:0; } }
+.ho-spark { position:absolute; width:10px; height:10px; border-radius:3px; border:2px solid var(--ink); pointer-events:none; z-index:502;
+  animation:ho-spark .65s cubic-bezier(.2,.8,.4,1) forwards; }
+@keyframes ho-spark { to { transform:translate(var(--dx), var(--dy)) rotate(300deg) scale(.2); opacity:0; } }
 .ho-ring { position:absolute; pointer-events:none; border-radius:50%; z-index:503; transform:translate(-50%,-50%);
-  border:4px solid #fff; box-shadow:0 0 0 4px var(--pink), 0 0 18px 6px rgba(255,201,60,.9); animation:ho-ring .8s ease-in-out infinite alternate; }
+  border:4px solid var(--ink); box-shadow:0 0 0 5px var(--lime), 0 0 0 8px var(--ink); animation:ho-ring .7s ease-in-out infinite alternate; }
 @keyframes ho-ring { from { transform:translate(-50%,-50%) scale(.85); } to { transform:translate(-50%,-50%) scale(1.15); } }
 .ho-scene.flash { animation:ho-flash .3s; }
-@keyframes ho-flash { 50% { box-shadow:inset 0 0 0 6px rgba(255,40,80,.9), 0 6px 0 rgba(43,29,74,.15); } }
+@keyframes ho-flash { 50% { border-color:var(--pink); box-shadow:0 5px 0 var(--ink), inset 0 0 0 6px var(--pink); } }
 
-.ho-panel { flex:none; display:flex; gap:8px; align-items:center; padding:10px 10px calc(10px + var(--safe-bottom)); }
-.ho-words { flex:1; display:flex; flex-wrap:wrap; gap:5px; justify-content:center; }
-.ho-word { position:relative; background:#fff; border-radius:999px; padding:5px 10px; font-weight:900; font-size:14px;
-  box-shadow:0 3px 0 rgba(43,29,74,.12); transition:background .3s, color .3s, transform .3s; }
-.ho-word::after { content:''; position:absolute; left:8px; right:8px; top:50%; height:3px; border-radius:3px; background:var(--pink);
-  transform:scaleX(0); transform-origin:left; transition:transform .35s .45s; }
-.ho-word.done { background:#e6fff4; color:var(--ink-soft); animation:ho-bump .4s .5s; }
-.ho-word.done::after { transform:scaleX(1); }
+/* серия */
+.ho-streak { position:absolute; z-index:520; left:50%; top:12px; transform:translateX(-50%); pointer-events:none; display:none;
+  font-family:var(--display); font-weight:900; font-size:22px; letter-spacing:-.5px; white-space:nowrap; color:var(--ink);
+  background:var(--yellow); border:3px solid var(--ink); border-radius:999px; padding:4px 16px; box-shadow:0 4px 0 var(--ink); }
+.ho-streak.on { display:block; }
+.ho-streak.hot { background:var(--lime); font-size:24px; }
+.ho-streak.mega { background:var(--pink); color:#fff; text-shadow:0 2px 0 var(--ink); font-size:26px; }
+.ho-streak.pop { animation:ho-spop .45s cubic-bezier(.2,1.9,.4,1); }
+.ho-streak.out { transition:opacity .3s, transform .3s; opacity:0; transform:translateX(-50%) scale(.7); }
+@keyframes ho-spop { 0% { transform:translateX(-50%) scale(.3) rotate(-10deg); } 60% { transform:translateX(-50%) scale(1.25) rotate(3deg); } }
+.ho-bonus { position:absolute; z-index:521; left:50%; top:58px; pointer-events:none; white-space:nowrap; font-family:var(--display); font-weight:800;
+  font-size:14px; color:var(--lime); background:var(--ink); border:2.5px solid var(--ink); border-radius:999px; padding:4px 12px;
+  transform:translateX(-50%); animation:ho-bonus 1.3s ease-out forwards; }
+@keyframes ho-bonus { 0% { transform:translateX(-50%) scale(.4); opacity:0; } 15% { transform:translateX(-50%) scale(1.15); opacity:1; }
+  75% { transform:translateX(-50%) translateY(-4px); opacity:1; } 100% { transform:translateX(-50%) translateY(-24px); opacity:0; } }
+
+/* финальный баннер (без кнопок; анимация только «from», в конце всегда видно) */
+.ho-win { position:absolute; inset:0; z-index:600; display:flex; align-items:center; justify-content:center; pointer-events:none;
+  background:rgba(17,17,17,.35); }
+.ho-win-b { font-family:var(--display); font-weight:900; font-size:34px; line-height:1; letter-spacing:-1.5px; text-align:center; color:var(--ink);
+  background:var(--lime); border:4px solid var(--ink); border-radius:28px; padding:18px 22px 16px; box-shadow:0 8px 0 var(--ink);
+  transform:rotate(-4deg); animation:ho-wpop .6s cubic-bezier(.2,1.8,.4,1) backwards; }
+.ho-win-b small { display:block; font-size:13px; letter-spacing:2px; margin-top:8px; }
+@keyframes ho-wpop { from { transform:scale(.2) rotate(-20deg); opacity:0; } }
+
+/* ---------- панель слов ---------- */
+.ho-panel { flex:none; display:flex; gap:10px; align-items:center; padding:12px 12px calc(12px + var(--safe-bottom)); }
+.ho-words { flex:1; display:flex; flex-wrap:wrap; gap:6px; justify-content:center; }
+.ho-word { position:relative; background:#fff; border:2.5px solid var(--ink); border-radius:14px; padding:4px 9px; font-weight:900; font-size:14px;
+  box-shadow:0 3px 0 var(--ink); transition:background .25s, color .25s; }
+.ho-word::after { content:''; position:absolute; left:5px; right:5px; top:50%; height:5px; margin-top:-2px; border-radius:3px; background:var(--pink);
+  transform:scaleX(0) rotate(-3deg); transform-origin:left; transition:transform .3s cubic-bezier(.5,0,.3,1); opacity:.9; }
+.ho-word.done { background:var(--lime); color:rgba(17,17,17,.6); animation:ho-wbump .45s cubic-bezier(.3,1.8,.5,1); }
+.ho-word.done::after { transform:scaleX(1) rotate(-3deg); }
 .ho-word .ho-wemo { display:none; margin-right:3px; }
 .ho-word.done .ho-wemo { display:inline; }
-@keyframes ho-bump { 40% { transform:scale(1.2); } }
-.ho-hint { position:relative; width:54px; height:54px; border-radius:50%; font-size:26px; padding:0; flex:none; }
-.ho-hint-n { position:absolute; right:-4px; top:-6px; background:var(--violet); color:#fff; font-size:11px; font-weight:900;
-  border-radius:999px; padding:2px 6px; box-shadow:0 2px 0 rgba(0,0,0,.2); white-space:nowrap; }
+@keyframes ho-wbump { 40% { transform:scale(1.25) rotate(-3deg); } }
+.ho-hint { position:relative; width:56px; height:56px; border-radius:18px; font-size:26px; padding:0; flex:none;
+  background:var(--yellow); border:3px solid var(--ink); box-shadow:0 4px 0 var(--ink); }
+.ho-hint:active { transform:translateY(3px); box-shadow:0 1px 0 var(--ink); }
+.ho-hint-n { position:absolute; right:-8px; top:-9px; background:var(--violet); color:#fff; font-family:var(--display); font-size:11px; font-weight:800;
+  border:2px solid var(--ink); border-radius:999px; padding:1px 6px; white-space:nowrap; }
 `;
 
 export function mount(root, ctx) {
@@ -134,28 +203,31 @@ export function mount(root, ctx) {
     root.innerHTML = '';
     root.append(style, ...nodes);
   }
+  const retrigger = (el, cls) => { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
 
   // ---------- Экран выбора локации ----------
   function showSelect() {
     const unlocked = progress.hiddenUnlocked;
-    const keysPill = h('div.ho-keys', '🗝️ ' + store.state.keys);
+    const keysPill = h('div.ho-pill', '🗝️ ' + store.state.keys);
     const top = h('div.game-top.ho-top',
       h('button.btn-icon', { onclick: () => { store.addEnergy(meta.cost.energy); ctx.exit(); } }, '✕'),
-      h('div.game-title', '🔍 Поиск предметов'),
+      h('div.game-title', '🔍 Поиск'),
       keysPill,
     );
     const cards = LOCATIONS.map((loc, i) => {
       const open = unlocked.includes(loc.id);
-      const card = h('button.ho-loc' + (open ? '' : '.locked'), { style: { background: loc.bg, animationDelay: i * 60 + 'ms' } },
+      const can = !open && store.state.keys >= loc.keys;
+      const card = h('button.ho-loc' + (open ? '' : '.locked') + (can ? '.can' : ''),
+        { style: { background: loc.tile, animationDelay: i * 70 + 'ms' } },
         h('div.ho-loc-ic', loc.icon),
-        open ? null : h('div.ho-lock', '🔒 ' + loc.keys + ' 🗝️'),
         h('div.ho-loc-name', loc.name),
-        h('div.ho-loc-info', open ? 'Играть ▶' : 'Открыть за ' + loc.keys + ' 🗝️'),
+        open ? h('div.ho-loc-go', 'Играть ▶') : h('div.ho-lock', '🔒 ' + loc.keys + ' 🗝️'),
       );
       card.addEventListener('click', () => {
-        if (open) return startGame(loc);
+        if (open) { sfx('tap'); buzz(8); return startGame(loc); }
         if (store.state.keys < loc.keys) {
-          card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake');
+          retrigger(card, 'shake');
+          sfx('error'); buzz([20, 40, 20]);
           toast('Не хватает ключей. Ключи дают в игре Три в ряд', 2600);
           return;
         }
@@ -163,6 +235,7 @@ export function mount(root, ctx) {
         if (!progress.hiddenUnlocked.includes(loc.id)) progress.hiddenUnlocked.push(loc.id);
         store.commit();
         const r = card.getBoundingClientRect();
+        sfx('reward'); buzz([10, 40, 10, 40, 30]);
         confetti(r.left + r.width / 2, r.top + r.height / 2, 30);
         toast(loc.icon + ' ' + loc.name + ' открыта!');
         showSelect();
@@ -171,7 +244,7 @@ export function mount(root, ctx) {
     });
     setScreen(top, h('div.ho-select',
       h('div.ho-sel-title', 'Куда пойдём?'),
-      h('p.ho-sel-sub.muted.small', '⏱ ' + TIME + ' сек · 🗝️ открывает новые места'),
+      h('div.ho-sel-sub', h('span.ho-tag', '⏱ ' + TIME + ' сек'), h('span.ho-tag', '🎯 ' + TARGETS + ' слов'), h('span.ho-tag', '🔥 серии = +время')),
       h('div.ho-grid', cards),
     ));
   }
@@ -203,13 +276,19 @@ export function mount(root, ctx) {
     let paused = false;
     let over = false;
     let ring = null;
+    let streak = 0;
+    let lastFoundAt = 0;
+    let streakHide = null;
+    let lastSec = TIME;
 
-    const timerEl = h('div.ho-timer', String(TIME));
+    const countPill = h('div.ho-pill', '0/' + targets.length);
     const exitBtn = h('button.btn-icon', '✕');
-    const top = h('div.game-top.ho-top', exitBtn, h('div.game-title', loc.icon + ' ' + loc.name), timerEl);
-    const barFill = h('div.ho-bar-fill');
-    const bar = h('div.ho-bar', barFill);
-    const scene = h('div.ho-scene', { style: { background: loc.bg } });
+    const top = h('div.game-top.ho-top', exitBtn, h('div.game-title', loc.icon + ' ' + loc.name), countPill);
+    const timeFill = h('div.ho-time-fill');
+    const timeNum = h('div.ho-time-num', '⏱ ' + TIME);
+    const timeBar = h('div.ho-time', timeFill, timeNum);
+    const streakEl = h('div.ho-streak');
+    const scene = h('div.ho-scene', { style: { background: loc.bg } }, streakEl);
     const wordEls = {};
     const words = h('div.ho-words', targets.map((t) => {
       const el = h('div.ho-word', h('span.ho-wemo', t.emoji), cap(t.word));
@@ -217,9 +296,9 @@ export function mount(root, ctx) {
       return el;
     }));
     const hintN = h('span.ho-hint-n');
-    const hintBtn = h('button.btn.btn-yellow.ho-hint', '🔍', hintN);
+    const hintBtn = h('button.ho-hint', '🔍', hintN);
     const panel = h('div.ho-panel', words, hintBtn);
-    setScreen(top, bar, scene, panel);
+    setScreen(top, timeBar, scene, panel);
 
     const updateHint = () => {
       const n = store.itemCount('ЛУПА');
@@ -238,14 +317,14 @@ export function mount(root, ctx) {
         scene.append(h('div.ho-blob', { style: {
           width: s + 'px', height: s * rnd(.6, 1.3) + 'px',
           left: rnd(-s / 2, W - s / 2) + 'px', top: rnd(-s / 2, H - s / 2) + 'px',
-          background: pick(BLOB_COLORS), opacity: rnd(.12, .3).toFixed(2),
+          background: pick(BLOB_COLORS), opacity: rnd(.14, .32).toFixed(2),
           borderRadius: `${rnd(30, 70)}% ${rnd(30, 70)}% ${rnd(30, 70)}% ${rnd(30, 70)}%`,
           transform: `rotate(${rnd(0, 180)}deg)`,
         } }));
       }
       const N = sceneItems.length;
-      let cols = Math.max(4, Math.round(Math.sqrt(N * W / H)));
-      let rows = Math.ceil(N / cols);
+      const cols = Math.max(4, Math.round(Math.sqrt(N * W / H)));
+      const rows = Math.ceil(N / cols);
       const cw = W / cols, ch = H / rows;
       const cellMin = Math.min(cw, ch);
       // размеры зависят от клетки, чтобы всё помещалось на маленьких экранах
@@ -282,10 +361,14 @@ export function mount(root, ctx) {
     // Таймер
     function renderTime() {
       const s = Math.max(0, Math.ceil(timeLeft));
-      timerEl.textContent = '⏱ ' + s;
-      timerEl.classList.toggle('low', timeLeft <= 15);
-      barFill.style.transform = `scaleX(${Math.max(0, timeLeft / TIME)})`;
-      barFill.classList.toggle('low', timeLeft <= 15);
+      timeNum.textContent = '⏱ ' + s;
+      timeFill.style.width = Math.max(0, Math.min(1, timeLeft / TIME)) * 100 + '%';
+      timeBar.classList.toggle('low', timeLeft <= LOW_TIME && timeLeft > 0);
+      // тиканье в последние секунды
+      if (s !== lastSec) {
+        if (s < lastSec && s <= LOW_TIME && s > 0 && !over) { sfx('tap'); if (s <= 3) buzz(6); }
+        lastSec = s;
+      }
     }
     renderTime();
     let last = performance.now();
@@ -304,24 +387,31 @@ export function mount(root, ctx) {
       const r = scene.getBoundingClientRect();
       return { x: e.clientX - r.left, y: e.clientY - r.top };
     }
-    function sparks(x, y, n = 14) {
+    function sparks(x, y, n = 16) {
       for (let i = 0; i < n; i++) {
-        const a = Math.random() * Math.PI * 2, d = rnd(30, 80);
-        const s = h('div.ho-spark', { style: { left: x - 4 + 'px', top: y - 4 + 'px', background: pick(BLOB_COLORS.slice(1)) } });
+        const a = Math.random() * Math.PI * 2, d = rnd(35, 90);
+        const s = h('div.ho-spark', { style: { left: x - 5 + 'px', top: y - 5 + 'px', background: pick(BLOB_COLORS.slice(1)) } });
         s.style.setProperty('--dx', Math.cos(a) * d + 'px');
         s.style.setProperty('--dy', Math.sin(a) * d + 'px');
         scene.append(s);
-        later(() => s.remove(), 650);
+        later(() => s.remove(), 700);
       }
+    }
+    function burst(x, y) {
+      const a = h('div.ho-burst', { style: { left: x + 'px', top: y + 'px' } });
+      const b = h('div.ho-burst.b2', { style: { left: x + 'px', top: y + 'px' } });
+      scene.append(a, b);
+      later(() => { a.remove(); b.remove(); }, 650);
     }
     function missFx(x, y) {
       const m = h('div.ho-miss', { style: { left: x + 'px', top: y + 'px' } });
       const t = h('div.ho-minus', { style: { left: x + 'px', top: y - 10 + 'px' } }, '−' + PENALTY + ' сек');
       scene.append(m, t);
-      scene.classList.remove('flash'); void scene.offsetWidth; scene.classList.add('flash');
-      later(() => { m.remove(); t.remove(); }, 850);
+      retrigger(scene, 'flash');
+      retrigger(timeBar, 'minus');
+      later(() => { m.remove(); t.remove(); }, 900);
     }
-    function flyToPanel(it) {
+    function flyToPanel(it, onArrive) {
       const el = els[it.id];
       const from = el.getBoundingClientRect();
       const to = wordEls[it.id].getBoundingClientRect();
@@ -330,27 +420,67 @@ export function mount(root, ctx) {
       } }, it.emoji);
       document.body.append(fly);
       requestAnimationFrame(() => requestAnimationFrame(() => {
-        fly.style.left = to.left + 14 + 'px';
+        fly.style.left = to.left + 16 + 'px';
         fly.style.top = to.top + to.height / 2 + 'px';
-        fly.style.fontSize = '16px';
+        fly.style.fontSize = '18px';
         fly.style.opacity = '0';
       }));
-      later(() => fly.remove(), 800);
+      later(() => { fly.remove(); onArrive(); }, 560);
+    }
+
+    // Серия быстрых находок
+    function bumpStreak(now) {
+      streak = now - lastFoundAt <= STREAK_WINDOW ? streak + 1 : 1;
+      lastFoundAt = now;
+      if (streakHide) { clearTimeout(streakHide); timers.delete(streakHide); streakHide = null; }
+      if (streak < 2) { hideStreak(); return; }
+      streakEl.className = 'ho-streak on' + (streak >= 5 ? ' mega' : streak >= 3 ? ' hot' : '');
+      streakEl.textContent = streak >= 3 ? '×' + streak + ' СЕРИЯ!' : '×' + streak;
+      retrigger(streakEl, 'pop');
+      if (streak >= 3) {
+        timeLeft = Math.min(TIME, timeLeft + STREAK_BONUS);
+        renderTime();
+        retrigger(timeBar, 'plus');
+        const b = h('div.ho-bonus', '🔥 +' + STREAK_BONUS + ' сек');
+        scene.append(b);
+        later(() => b.remove(), 1350);
+        sfx('win'); buzz([10, 30, 10, 30, 10]);
+      } else {
+        buzz([10, 30, 10]);
+      }
+      // серия «остывает», если долго нет находок
+      streakHide = later(() => { streakHide = null; hideStreak(); }, STREAK_WINDOW);
+    }
+    function hideStreak() {
+      if (!streakEl.classList.contains('on')) return;
+      streakEl.classList.add('out');
+      later(() => { if (streakEl.classList.contains('out')) streakEl.className = 'ho-streak'; }, 320);
+    }
+    function resetStreak() {
+      streak = 0; lastFoundAt = 0;
+      if (streakHide) { clearTimeout(streakHide); timers.delete(streakHide); streakHide = null; }
+      hideStreak();
     }
 
     function onFound(it) {
       found.add(it.id);
       const el = els[it.id];
       const r = el.getBoundingClientRect(), s = scene.getBoundingClientRect();
-      sparks(r.left - s.left + r.width / 2, r.top - s.top + r.height / 2);
-      flyToPanel(it);
+      const x = r.left - s.left + r.width / 2, y = r.top - s.top + r.height / 2;
+      burst(x, y);
+      sparks(x, y);
+      sfx('coin'); buzz(15);
+      flyToPanel(it, () => {
+        wordEls[it.id].classList.add('done');
+        countPill.textContent = found.size + '/' + targets.length;
+        retrigger(countPill, 'bump');
+      });
       el.classList.add('found');
       el.style.zIndex = 400;
       el.style.pointerEvents = 'none';
-      wordEls[it.id].classList.add('done');
       if (ring && ring.dataset.id === it.id) { ring.remove(); ring = null; }
-      if (navigator.vibrate) try { navigator.vibrate(30); } catch (e) { /* нет вибрации */ }
-      if (found.size === targets.length) win();
+      if (found.size === targets.length) { hideStreak(); win(); return; }
+      bumpStreak(performance.now());
     }
 
     function onTap(e) {
@@ -358,10 +488,10 @@ export function mount(root, ctx) {
       const p = localPoint(e);
       // Сначала ищем ненайденную цель под пальцем (с запасом), даже если её частично перекрыли.
       let best = null, bestD = Infinity;
+      const sr = scene.getBoundingClientRect();
       for (const t of targets) {
         if (found.has(t.id) || !els[t.id]) continue;
         const r = els[t.id].getBoundingClientRect();
-        const sr = scene.getBoundingClientRect();
         const l = r.left - sr.left - HIT_PAD, tp = r.top - sr.top - HIT_PAD;
         const rr = r.right - sr.left + HIT_PAD, b = r.bottom - sr.top + HIT_PAD;
         if (p.x >= l && p.x <= rr && p.y >= tp && p.y <= b) {
@@ -373,7 +503,8 @@ export function mount(root, ctx) {
       timeLeft = Math.max(0, timeLeft - PENALTY);
       renderTime();
       missFx(p.x, p.y);
-      if (navigator.vibrate) try { navigator.vibrate([20, 40, 20]); } catch (er) { /* нет вибрации */ }
+      resetStreak();
+      sfx('error'); buzz([20, 40, 20]);
       if (timeLeft <= 0) lose();
     }
     scene.addEventListener('pointerdown', onTap);
@@ -387,10 +518,12 @@ export function mount(root, ctx) {
       if (store.itemCount('ЛУПА') > 0) {
         store.removeItem('ЛУПА');
       } else if (!store.spendEnergy(HINT_COST)) {
+        sfx('error');
         toast('Нужна лупа 🔍 — собери слово ЛУПА в Эрудите', 3200);
         return;
       }
       updateHint();
+      sfx('tap'); buzz(10);
       const t = pick(left);
       const el = els[t.id];
       const r = el.getBoundingClientRect(), s = scene.getBoundingClientRect();
@@ -436,21 +569,31 @@ export function mount(root, ctx) {
     function win() {
       over = true; // блокируем тапы, пока играет праздник
       clearInterval(tick); tick = null;
-      const s = scene.getBoundingClientRect();
-      confetti(s.left + s.width / 2, s.top + s.height / 2, 50);
-      later(() => confetti(s.left + s.width * .25, s.top + s.height * .4, 30), 250);
-      later(() => confetti(s.left + s.width * .75, s.top + s.height * .4, 30), 450);
-      later(() => { over = false; end(true, 'Всё найдено!'); }, 1100);
+      timeBar.classList.remove('low');
+      later(() => {
+        if (!alive) return;
+        const left = Math.max(0, Math.ceil(timeLeft));
+        scene.append(h('div.ho-win', h('div.ho-win-b', 'ВСЁ', h('br'), 'НАЙДЕНО!', h('small', '⏱ ' + left + ' сек в запасе'))));
+        sfx('reward'); buzz([20, 50, 20, 50, 60]);
+        const s = scene.getBoundingClientRect();
+        confetti(s.left + s.width / 2, s.top + s.height / 2, 50);
+        later(() => confetti(s.left + s.width * .25, s.top + s.height * .35, 35), 250);
+        later(() => confetti(s.left + s.width * .75, s.top + s.height * .35, 35), 450);
+        later(() => confetti(s.left + s.width / 2, s.top + s.height * .2, 30), 700);
+      }, 450);
+      later(() => { over = false; end(true, 'Всё найдено!'); }, 2100);
     }
 
     function lose() {
       over = true;
       clearInterval(tick); tick = null;
       timeLeft = 0; renderTime();
+      timeBar.classList.remove('low');
+      sfx('error'); buzz([40, 60, 40]);
       // показываем, где прятались ненайденные
       for (const t of targets) if (!found.has(t.id) && els[t.id]) {
         els[t.id].style.zIndex = 300;
-        els[t.id].style.filter = 'drop-shadow(0 0 8px #fff) drop-shadow(0 0 4px #ff4f8b)';
+        els[t.id].style.filter = 'drop-shadow(0 0 0 #111) drop-shadow(0 0 6px #fff) drop-shadow(0 0 4px #ff5fa2)';
       }
       later(() => { over = false; end(false, 'Время вышло'); }, 1200);
     }
