@@ -205,3 +205,33 @@ body { background: #1b1b1f; }
 .st-knob { top: 1px; left: 1px; border: 2px solid var(--ink); }
 .gm-cost { z-index: 2; }
 .gm-big .ltr-big { font-size: .78em; }
+
+/* ---------- Сундук за серию игр ---------- */
+.gm-chest { display: flex; align-items: center; gap: 10px; margin: -4px 0 14px; padding: 8px 12px; background: var(--ink); color: #fff; border-radius: 999px; }
+.gm-chest-ic { font-size: 20px; }
+.gm-chest-dots { display: flex; gap: 6px; flex: 1; }
+.gm-chest-dots i { flex: 1; height: 10px; border-radius: 99px; background: #3a3a40; }
+.gm-chest-dots i.on { background: var(--lime); box-shadow: 0 0 8px var(--lime); }
+.gm-chest-t { font-family: var(--display); font-size: 11px; font-weight: 800; color: var(--lime); white-space: nowrap; }
+
+/* ---------- Испытания дня ---------- */
+.dl-card { margin-top: 16px; background: #fff; border: var(--bd); box-shadow: var(--hard); border-radius: 24px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.dl-head { display: flex; justify-content: space-between; align-items: center; font-family: var(--display); font-size: 15px; }
+.dl-n { background: var(--ink); color: var(--lime); border-radius: 99px; padding: 2px 10px; font-size: 12px; }
+.dl-row { display: flex; align-items: center; gap: 10px; border: 2px solid var(--ink); border-radius: 16px; background: var(--card-soft); padding: 8px 10px; text-align: left; color: var(--ink); }
+.dl-row.ready { background: var(--lime); animation: hud-bump 1.2s infinite; }
+.dl-row.done { opacity: .55; }
+.dl-ic { font-size: 22px; }
+.dl-t { flex: 1; display: flex; flex-direction: column; gap: 4px; font-weight: 800; font-size: 13px; }
+.dl-bar { height: 8px; border: 2px solid var(--ink); border-radius: 99px; background: #fff; overflow: hidden; }
+.dl-bar i { display: block; height: 100%; background: var(--violet); }
+.dl-go { font-family: var(--display); font-weight: 800; font-size: 12px; min-width: 34px; text-align: center; }
+.dl-chest { display: flex; align-items: center; justify-content: center; gap: 8px; border: 2px dashed var(--ink); border-radius: 16px; padding: 10px; background: none;
+  font-family: var(--display); font-weight: 800; font-size: 14px; color: var(--ink-soft); }
+.dl-chest.ready { border-style: solid; background: var(--yellow); color: var(--ink); box-shadow: var(--hard); animation: hud-bump 1s infinite; }
+.dl-chest.done { opacity: .5; }
+.tab-play .tab-badge { position: absolute; top: 2px; right: 2px; }
+.gm-yellow { background: var(--yellow); }
+.gm-tile:nth-child(6) .gm-big { animation-delay: -1s; }
+/* чётное число плиток: последняя — широкая, чтобы сетка не «висела» */
+.gm-grid .gm-tile:last-child:nth-child(2n) { grid-column: span 2; min-height: 120px; flex-direction: row; gap: 14px; }

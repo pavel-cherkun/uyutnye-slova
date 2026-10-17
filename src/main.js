@@ -13,7 +13,9 @@ import { loadDict } from './data/dict.js';
 import { renderOrders, readyOrders } from './screens/orders.js';
 import { setupDevice } from './ui/device.js';
 import { maybeDailyGift, maybeIosHint } from './screens/settings.js';
-import { syncLetters, levelInfo, gainXP } from './progression.js';
+import { syncLetters, levelInfo, gainXP, chestReward, CHEST_EVERY } from './progression.js';
+import { openChest } from './ui/fx.js';
+import { dailyReady } from './screens/daily.js';
 
 const app = document.getElementById('app');
 // «Играть» — большая кнопка по центру меню
@@ -81,7 +83,8 @@ function renderTabs() {
     h((t.play ? 'button.tab-play' : 'button.tab') + (t.id === current ? '.active' : '') + (t.play && current !== 'games' ? '.pulse' : ''),
       { onclick: () => go(t.id), 'data-tab': t.id },
       h('span.ic', t.icon), t.label,
-      t.id === 'orders' && readyOrders() ? h('span.tab-badge', readyOrders()) : null)));
+      t.id === 'orders' && readyOrders() ? h('span.tab-badge', readyOrders()) : null,
+      t.play && dailyReady() ? h('span.tab-badge', '!') : null)));
 }
 
 function go(id) {
@@ -165,6 +168,14 @@ async function openGame(id) {
       showReward(title, reward);
       // опыт за сыгранную партию: побольше, если были трофеи
       gainXP(10 + Object.values(reward.items || {}).reduce((a, b) => a + b, 0) * 2, { x: innerWidth / 2, y: innerHeight * 0.3 });
+      // каждые CHEST_EVERY партий — сундук
+      state.progress.playCount = (state.progress.playCount || 0) + 1;
+      if (state.progress.playCount % CHEST_EVERY === 0) {
+        const r = chestReward('silver');
+        store.applyReward(r);
+        openChest(`Сундук за ${CHEST_EVERY} игр!`, 'silver', r, () => refresh());
+      }
+      store.commit();
     },
     exit: close,
   };

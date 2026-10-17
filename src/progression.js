@@ -70,3 +70,23 @@ function levelReward(lvl) {
 
 // Опыт за слово — по редкости; новое слово ×2
 export const WORD_XP = { c: 4, r: 8, e: 15, l: 30 };
+
+// ---------- Сундуки ----------
+// tier: 'wood' | 'silver' | 'gold' — чем выше, тем больше и тем выше шанс на эпик/легенду
+export function chestReward(tier = 'wood') {
+  const k = { wood: 1, silver: 2, gold: 3 }[tier];
+  let letters = '';
+  for (let i = 0; i < 3 + k * 3; i++) letters += rl();
+  const reward = { energy: 6 + k * 6, letters, items: {} };
+  if (k >= 2 || Math.random() < 0.35) reward.keys = k >= 3 ? 2 : 1;
+  const rolls = k + 1;
+  for (let i = 0; i < rolls; i++) {
+    const r = Math.random();
+    const rar = r < 0.04 * k ? 'l' : r < 0.15 * k ? 'e' : r < 0.45 ? 'r' : 'c';
+    const pool = ITEMS.filter((it) => it.rarity === rar);
+    const id = pool[Math.floor(Math.random() * pool.length)].id;
+    reward.items[id] = (reward.items[id] || 0) + 1;
+  }
+  return reward;
+}
+export const CHEST_EVERY = 5; // каждые N сыгранных партий — сундук
