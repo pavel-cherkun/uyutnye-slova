@@ -35,10 +35,10 @@ export const CATEGORIES = {
 };
 
 export const RARITY = {
-  c: { name: 'Обычный', color: '#7bc96f', burn: 2 },
-  r: { name: 'Редкий',  color: '#4aa8ff', burn: 4 },
-  e: { name: 'Эпик',    color: '#b46bff', burn: 8 },
-  l: { name: 'Легенда', color: '#ffb000', burn: 16 },
+  c: { name: 'Обычный', color: '#7bc96f', burn: 1 },
+  r: { name: 'Редкий',  color: '#4aa8ff', burn: 3 },
+  e: { name: 'Эпик',    color: '#b46bff', burn: 6 },
+  l: { name: 'Легенда', color: '#ffb000', burn: 12 },
 };
 export const RARITY_ORDER = ['c', 'r', 'e', 'l'];
 
