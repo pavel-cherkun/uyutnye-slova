@@ -235,3 +235,16 @@ body { background: #1b1b1f; }
 .gm-tile:nth-child(6) .gm-big { animation-delay: -1s; }
 /* чётное число плиток: последняя — широкая, чтобы сетка не «висела» */
 .gm-grid .gm-tile:last-child:nth-child(2n) { grid-column: span 2; min-height: 120px; flex-direction: row; gap: 14px; }
+
+/* ---------- Производительность: на телефоне — никаких вечных анимаций и размытия ---------- */
+.modal-back { backdrop-filter: none; }
+.tab-play.pulse::after { display: none; }
+.qs-card.ok .qs-go, .dx-claim, .dl-row.ready, .dl-chest.ready { animation: none; }
+.qs-card.ok .qs-go { box-shadow: 0 0 0 4px var(--yellow); }
+.dl-row.ready, .dl-chest.ready, .dx-claim { box-shadow: 0 0 0 3px var(--ink), 0 4px 0 var(--ink); }
+.gm-tile:not(.locked) .gm-big { animation: none; }
+.gm-tile:active .gm-big { transform: scale(1.12) rotate(-6deg); }
+.gm-tile { animation-duration: .3s; }
+.ov-fire, .splash-logo { animation: none; }
+/* Мгновенный отклик на касание */
+button { touch-action: manipulation; }

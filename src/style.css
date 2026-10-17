@@ -37,6 +37,7 @@ input { font-family: inherit; }
   position: relative;
   max-width: 480px;
   margin: 0 auto;
+  height: 100vh;
   height: 100dvh;
   background: var(--bg);
   display: flex;

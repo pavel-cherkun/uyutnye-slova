@@ -5,7 +5,7 @@ import { state, subscribe, totalLetters } from './state.js';
 import { h, toast, showReward, modal } from './ui/common.js';
 import { avatarSVG } from './ui/avatar.js';
 import { renderCreate, renderProfile } from './screens/character.js';
-import { renderHome } from './screens/home.js';
+import { renderPet, petBadge } from './screens/pet.js';
 import { renderBag } from './screens/bag.js';
 import { renderOven } from './screens/oven.js';
 import { renderGames, GAMES, gameIcon, flowNodes } from './screens/games.js';
@@ -20,7 +20,7 @@ import { dailyReady } from './screens/daily.js';
 const app = document.getElementById('app');
 // «Играть» — большая кнопка по центру меню
 const TABS = [
-  { id: 'home', icon: '🏠', label: 'Дом' },
+  { id: 'pet', icon: '🐾', label: 'Питомец', badge: petBadge },
   { id: 'bag', icon: '🎒', label: 'Сумка' },
   { id: 'games', icon: '▶', label: 'Играть', play: true },
   { id: 'oven', icon: '🔥', label: 'Печь' },
@@ -42,6 +42,7 @@ function boot() {
     return;
   }
   hudEl = h('div.hud');
+  hudRefs = null; tabsKey = '';
   screenEl = h('div', { style: { display: 'contents' } });
   tabbarEl = h('div.tabbar');
   app.replaceChildren(hudEl, screenEl, tabbarEl);
@@ -51,40 +52,59 @@ function boot() {
   setTimeout(() => { if (!maybeDailyGift(maybeIosHint)) maybeIosHint(); }, 400);
 }
 
+// Шапку и меню строим один раз, потом меняем только числа — иначе кнопки пересоздаются
+// прямо под пальцем, и нажатие теряется.
+let hudRefs = null;
 let prevHud = {};
 function renderHud() {
   if (!hudEl) return;
   const vals = { energy: state.energy, keys: state.keys, letters: totalLetters() };
-  const pill = (k, ic, title) => {
-    const el = h('div.hud-pill', { title, 'data-k': k }, ic === 'L' ? h('span.ltr', 'А') : h('span.ic', ic), vals[k]);
-    if (prevHud[k] != null && prevHud[k] !== vals[k]) el.classList.add('bump');
-    return el;
-  };
   const lv = levelInfo();
-  hudEl.replaceChildren(
-    h('button.hud-me', { onclick: () => go('me'), 'aria-label': 'Профиль' },
-      h('span.hud-ava', { html: avatarSVG(state.profile, { bg: false }) }),
-      h('span.hud-lvlbox',
-        h('span.hud-lvltext', h('span', `УР. ${lv.lvl}`), h('span', `${lv.cur}/${lv.need} ⭐`)),
-        h('span.hud-xp', h('i', { style: { width: Math.round((lv.cur / lv.need) * 100) + '%' } })),
+  if (!hudRefs) {
+    const pill = (k, ic, title) => {
+      const num = h('span.hud-num', '');
+      const el = h('div.hud-pill', { title, 'data-k': k }, ic === 'L' ? h('span.ltr', 'А') : h('span.ic', ic), num);
+      return { el, num };
+    };
+    const ava = h('span.hud-ava');
+    const lvl = h('span', '');
+    const xpT = h('span', '');
+    const xpBar = h('i');
+    const pills = { energy: pill('energy', '⚡', 'Энергия'), keys: pill('keys', '🗝️', 'Ключи'), letters: pill('letters', 'L', 'Буквы') };
+    hudEl.replaceChildren(
+      h('button.hud-me', { onclick: () => go('me'), 'aria-label': 'Профиль' },
+        ava,
+        h('span.hud-lvlbox', h('span.hud-lvltext', lvl, xpT), h('span.hud-xp', xpBar)),
       ),
-    ),
-    h('div.hud-res',
-      pill('energy', '⚡', 'Энергия'),
-      pill('keys', '🗝️', 'Ключи'),
-      pill('letters', 'L', 'Буквы'),
-    ),
-  );
+      h('div.hud-res', pills.energy.el, pills.keys.el, pills.letters.el),
+    );
+    hudRefs = { ava, lvl, xpT, xpBar, pills, avaKey: '' };
+  }
+  const avaKey = JSON.stringify(state.profile);
+  if (hudRefs.avaKey !== avaKey) { hudRefs.ava.innerHTML = avatarSVG(state.profile, { bg: false }); hudRefs.avaKey = avaKey; }
+  hudRefs.lvl.textContent = `УР. ${lv.lvl}`;
+  hudRefs.xpT.textContent = `${lv.cur}/${lv.need} ⭐`;
+  hudRefs.xpBar.style.width = Math.round((lv.cur / lv.need) * 100) + '%';
+  for (const [k, ref] of Object.entries(hudRefs.pills)) {
+    if (ref.num.textContent !== String(vals[k])) {
+      ref.num.textContent = vals[k];
+      if (prevHud[k] != null) { ref.el.classList.remove('bump'); void ref.el.offsetWidth; ref.el.classList.add('bump'); }
+    }
+  }
   prevHud = vals;
 }
 
-function renderTabs() {
-  tabbarEl.replaceChildren(...TABS.map((t) =>
-    h((t.play ? 'button.tab-play' : 'button.tab') + (t.id === current ? '.active' : '') + (t.play && current !== 'games' ? '.pulse' : ''),
+let tabsKey = '';
+function renderTabs(force) {
+  const badges = TABS.map((t) => (t.id === 'orders' ? readyOrders() : t.play ? dailyReady() : t.badge ? t.badge() : 0));
+  const key = current + '|' + badges.join(',');
+  if (!force && key === tabsKey) return; // ничего не изменилось — кнопки не трогаем
+  tabsKey = key;
+  tabbarEl.replaceChildren(...TABS.map((t, i) =>
+    h((t.play ? 'button.tab-play' : 'button.tab') + (t.id === current ? '.active' : ''),
       { onclick: () => go(t.id), 'data-tab': t.id },
       h('span.ic', t.icon), t.label,
-      t.id === 'orders' && readyOrders() ? h('span.tab-badge', readyOrders()) : null,
-      t.play && dailyReady() ? h('span.tab-badge', '!') : null)));
+      badges[i] ? h('span.tab-badge', t.play ? '!' : badges[i]) : null)));
 }
 
 function go(id) {
@@ -96,13 +116,19 @@ function go(id) {
 function refresh() {
   if (!screenEl) return;
   const scroll = screenEl.querySelector('.screen')?.scrollTop || 0;
-  const r = { home: renderHome, games: renderGames, bag: renderBag, oven: renderOven, orders: renderOrders, me: renderProfile }[current];
+  const r = { pet: renderPet, games: renderGames, bag: renderBag, oven: renderOven, orders: renderOrders, me: renderProfile }[current];
   r(screenEl, current === 'me' ? () => { renderHud(); refresh(); } : nav);
   const sc = screenEl.querySelector('.screen');
   if (sc) sc.scrollTop = scroll;
 }
 
-subscribe(() => { if (!gameOpen) { renderHud(); if (tabbarEl) renderTabs(); } });
+// обновления после сохранений — не чаще раза в кадр
+let hudQueued = false;
+subscribe(() => {
+  if (gameOpen || hudQueued) return;
+  hudQueued = true;
+  requestAnimationFrame(() => { hudQueued = false; renderHud(); if (tabbarEl) renderTabs(); });
+});
 
 async function openGame(id) {
   const g = GAMES.find((x) => x.id === id);
