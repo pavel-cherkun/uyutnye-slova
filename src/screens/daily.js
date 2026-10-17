@@ -9,7 +9,6 @@ import { openChest, quickReward } from '../ui/fx.js';
 
 const plays = (id) => state.stats.plays?.[id] || 0;
 const totalWords = () => Object.values(state.progress.wordsMade).reduce((a, b) => a + b, 0);
-const placed = () => Object.values(state.rooms).reduce((n, r) => n + Object.keys(r.cells).length, 0);
 
 // метрики, от которых считается прогресс
 const METRICS = {
@@ -21,7 +20,7 @@ const METRICS = {
   burned: () => state.oven.burned || 0,
   orders: () => state.progress.ordersDone || 0,
   xp: () => state.xp || 0,
-  placed,
+  walks: () => state.pet?.walks || 0,
 };
 
 const POOL = [
@@ -34,7 +33,7 @@ const POOL = [
   { m: 'burned', n: 3, icon: '🔥', text: 'Сожги 3 вещи' },
   { m: 'orders', n: 1, icon: '📋', text: 'Выполни заказ' },
   { m: 'xp', n: 80, icon: '⭐', text: 'Набери 80 ⭐' },
-  { m: 'placed', n: 2, icon: '🏠', text: 'Поставь 2 вещи дома' },
+  { m: 'walks', n: 1, icon: '🦮', text: 'Своди питомца гулять' },
 ];
 
 const today = () => new Date().toLocaleDateString('sv');

@@ -95,7 +95,6 @@ export function itemMenu(id, rerender, nav) {
       eat ? h('button.btn.btn-green', {
         onclick: () => { removeItem(id); addEnergy(eat); toast(`Ням! +${eat} ⚡`); close(); },
       }, `Съесть · +${eat} ⚡`) : null,
-      isPlaceable(id) ? h('button.btn.btn-violet', { onclick: () => { m.close(); nav.go('home'); toast('Нажми на «+» в комнате'); } }, 'Поставить в квартиру') : null,
       h('button.btn.btn-orange', {
         onclick: () => { removeItem(id); addEnergy(burn); state.oven.burned++; toast(`🔥 +${burn} ⚡`); close(); },
       }, `Сжечь в печи · +${burn} ⚡`),

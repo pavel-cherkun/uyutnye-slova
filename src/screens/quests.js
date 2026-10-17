@@ -7,9 +7,9 @@ import { gainXP } from '../progression.js';
 import { quickReward } from '../ui/fx.js';
 
 const plays = (id) => state.stats.plays?.[id] || 0;
-const placed = () => Object.values(state.rooms).reduce((n, r) => n + Object.keys(r.cells).length, 0);
 const words = () => Object.keys(state.progress.wordsMade).length;
 const made = (w) => !!state.progress.wordsMade[w];
+const places = () => state.progress.places || ['КУХНЯ'];
 const kinds = () => Object.keys(state.items).filter((id) => getItem(id).tier === 1).length;
 function cardCats() {
   const by = {};
@@ -21,7 +21,7 @@ function cardCats() {
 export const QUESTS = [
   { id: 'q1', icon: '🎯', text: 'Сыграй в Блоки', go: 'shooter', done: () => plays('shooter') >= 1, reward: { energy: 7, letters: 'АОЕИ' } },
   { id: 'q2', icon: '✍️', text: 'Собери слово КОТ', go: 'erudite', done: () => made('КОТ'), reward: { energy: 10 } },
-  { id: 'q3', icon: '🏠', text: 'Поставь кота дома', tab: 'home', done: () => placed() >= 1, reward: { energy: 5, letters: 'СТОЛ' } },
+  { id: 'q3', icon: '🐾', text: 'Заведи питомца', tab: 'pet', done: () => !!state.pet, reward: { energy: 5, letters: 'СТОЛ' } },
   { id: 'q4', icon: '✍️', text: 'Собери 3 слова', go: 'erudite', done: () => words() >= 3, reward: { energy: 7 } },
   { id: 'q5', icon: '🔍', text: 'Сыграй в Поиск', go: 'hidden', done: () => plays('hidden') >= 1, reward: { energy: 8 } },
   { id: 'q6', icon: '🔨', text: 'Собери слово МОЛОТОК', go: 'erudite', done: () => made('МОЛОТОК') || state.items['МОЛОТОК'] > 0, reward: { energy: 10 } },
@@ -32,10 +32,10 @@ export const QUESTS = [
   { id: 'q10', icon: '🔥', text: 'Сожги что-нибудь в печи', tab: 'oven', done: () => state.oven.burned >= 1, reward: { energy: 8 } },
   { id: 'q11', icon: '🔍', text: 'Собери слово ЛУПА', go: 'erudite', done: () => made('ЛУПА') || state.items['ЛУПА'] > 0, reward: { energy: 7 } },
   { id: 'q12', icon: '📋', text: 'Выполни заказ соседа', tab: 'orders', done: () => (state.progress.ordersDone || 0) >= 1, reward: { keys: 1 } },
-  { id: 'q13', icon: '🍳', text: 'Открой кухню: КУХНЯ', go: 'erudite', done: () => !!state.rooms.kitchen, reward: { items: { ЧАЙНИК: 1, ЧАШКА: 2 } } },
+  { id: 'q13', icon: '🌲', text: 'Собери слово ЛЕС — откроется место', go: 'erudite', done: () => places().includes('ЛЕС'), reward: { energy: 10 } },
   { id: 'q14', icon: '🎁', text: 'Собери 8 разных вещей', go: 'hidden', done: () => kinds() >= 8, reward: { energy: 10 } },
-  { id: 'q15', icon: '🏠', text: 'Поставь 8 вещей дома', tab: 'home', done: () => placed() >= 8, reward: { items: { КАРТИНА: 1 } } },
-  { id: 'q16', icon: '🛏️', text: 'Открой спальню', go: 'erudite', done: () => !!state.rooms.bedroom, reward: { items: { КРОВАТЬ: 1 } } },
+  { id: 'q15', icon: '🗺️', text: 'Открой 4 места в Поиске', go: 'erudite', done: () => places().length >= 4, reward: { keys: 1 } },
+  { id: 'q16', icon: '🦮', text: 'Отправь питомца гулять', tab: 'pet', done: () => (state.pet?.walks || 0) >= 1, reward: { energy: 10, keys: 1 } },
   { id: 'q17', icon: '🍬', text: 'Пройди 5 уровней Три в ряд', go: 'match3', done: () => state.progress.match3Level >= 6, reward: { keys: 2 } },
 ];
 
