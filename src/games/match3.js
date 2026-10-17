@@ -586,7 +586,7 @@ function playLevel(root, ctx, chosen) {
     g.el = h('div.m3-goal', gemEl(g.type), g.num);
     return g.el;
   }));
-  const themeEl = h('div.m3-theme', `🎒 Фишки — твои предметы · собери за ${cfg.moves} ходов, получишь их ×2`);
+  const themeEl = h('div.m3-theme', `🎁 ×2 · ${cfg.moves} ходов`);
   const boardEl = h('div.m3-board');
   const wrap = h('div.m3-wrap', boardEl);
   const hammerBtn = h('button.btn.btn-orange.m3-hammer', { onclick: onHammer });
@@ -1127,7 +1127,7 @@ export function mount(root, ctx) {
   const go = h('button.btn.btn-big.btn-green', { onclick: start }, 'Играть ▶');
 
   body.append(
-    h('div.m3p-lead', 'Выбери от 3 до 6 своих предметов — они станут фишками. Предметы не тратятся: за каждую выполненную цель получишь ещё 2 таких же. Плюс ключ 🗝️ для «Поиска».'),
+    h('div.m3p-lead', '🎁 Выбери 3–6 вещей для фишек · цель ×2'),
     selEl, go, gridEl,
   );
 

@@ -129,7 +129,7 @@ export function mount(root, ctx) {
 
   // --- DOM ---
   const turnPill = h('div.sh-pill', 'Ход 1');
-  const letterPill = h('div.sh-pill', '🔤 0');
+  const letterPill = h('div.sh-pill', h('span.ltr', 'А'), ' 0');
   const strip = h('div.sh-strip', h('span.sh-strip-empty', 'Сбивай блоки с буквами — они попадут сюда'));
   const canvas = h('canvas');
   const speedBtn = h('button.sh-btn.sh-hide', { onclick: onSpeed }, '⏩ x1');
@@ -355,7 +355,7 @@ export function mount(root, ctx) {
       flying.delete(el);
       if (S.finished) return;
       arrived++;
-      letterPill.textContent = '🔤 ' + arrived;
+      letterPill.replaceChildren(h('span.ltr', 'А'), ' ' + arrived);
       letterPill.classList.remove('sh-bump');
       void letterPill.offsetWidth;
       letterPill.classList.add('sh-bump');

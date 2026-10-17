@@ -171,7 +171,7 @@ export function mount(root, ctx) {
     });
     setScreen(top, h('div.ho-select',
       h('div.ho-sel-title', 'Куда пойдём?'),
-      h('p.ho-sel-sub.muted.small', 'Найди 7 предметов за ' + TIME + ' секунд. Новые комнаты открываются ключами из «Три в ряд».'),
+      h('p.ho-sel-sub.muted.small', '⏱ ' + TIME + ' сек · 🗝️ открывает новые места'),
       h('div.ho-grid', cards),
     ));
   }

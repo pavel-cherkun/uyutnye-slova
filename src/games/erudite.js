@@ -13,7 +13,7 @@ import { nextStage, checkLetterUnlock, wordsCount } from '../progression.js';
 const TOOL_USE = { МОЛОТОК: 'бустер для «Три в ряд»', ЛУПА: 'подсказка в «Поиске»' };
 
 export const meta = {
-  id: 'erudite', title: 'Эрудит', emoji: '🔤',
+  id: 'erudite', title: 'Эрудит', emoji: '✍️',
   desc: 'Составляй слова из своих букв', cost: { energy: 0 }, gives: 'предметы, комнаты',
 };
 
@@ -74,7 +74,6 @@ export function mount(root, ctx) {
   const wordEl = h('div.er-word');
   const previewEl = h('div.er-preview');
   const keysEl = h('div.er-keys');
-  const goalEl = h('div.er-goal');
   const madeEl = h('div.er-made');
   const nextEl = h('div.er-next');
   const plural = (n) => (n % 10 === 1 && n % 100 !== 11 ? 'слово' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'слова' : 'слов');
@@ -84,11 +83,10 @@ export function mount(root, ctx) {
     h('style', CSS),
     h('div.game-top',
       h('button.btn-icon', { onclick: () => ctx.exit() }, '✕'),
-      h('div.game-title', '🔤 Эрудит'),
+      h('div.game-title', '✍️ Эрудит'),
       h('button.btn.btn-yellow.btn-sm', { onclick: hint, style: { boxShadow: '0 3px 0 #d79a00' } }, `💡 ${HINT_COST}🪙`),
     ),
     h('div.er-wrap',
-      goalEl,
       nextEl,
       h('div.er-board', wordEl, previewEl),
       h('div.er-actions',
@@ -108,7 +106,7 @@ export function mount(root, ctx) {
     wordEl.classList.remove('shake');
     wordEl.replaceChildren(...(word.length
       ? word.map((ch, i) => h('span.tile', { onclick: () => { word.splice(i, 1); render(); } }, ch))
-      : [h('div.er-empty', wordsCount() < 3 ? 'Нажимай на буквы снизу. Попробуй: КОТ, СТОЛ, ЛИСТ, НОС' : 'Нажимай на буквы снизу')]));
+      : [h('div.er-empty', wordsCount() < 2 ? 'Попробуй: К · О · Т' : '')]));
 
     const w = word.join('');
     const c = w.length >= 2 ? classifyWord(w) : null;
@@ -116,16 +114,14 @@ export function mount(root, ctx) {
     submitBtn.disabled = !c || c.kind === 'invalid';
     if (c) {
       const score = wordScore(w);
-      if (c.kind === 'invalid') previewEl.append(h('span.bad', w.length < 3 ? '…' : 'Такого слова нет в словаре'));
+      if (c.kind === 'invalid') previewEl.append(h('span.bad', w.length < 3 ? '…' : 'нет такого слова'));
       else if (c.kind === 'room') previewEl.append(state.rooms[c.room.id]
-        ? h('span', `Комната «${c.room.name}» уже открыта · +${score} 🪙`)
-        : h('span.room', `🔓 Откроет комнату «${c.room.name}»!`));
+        ? h('span', `🏠 · +${score}🪙`)
+        : h('span.room', `🔓 ${c.room.name}!`));
       else {
         const it = getItem(c.id);
-        const label = TOOL_USE[c.id] ? 'инструмент: ' + TOOL_USE[c.id]
-          : c.kind === 'item' ? RARITY[it.rarity].name.toLowerCase() + ' предмет'
-          : c.kind === 'card' ? 'карточка · ' + CATEGORIES[it.cat].name.toLowerCase() : 'эссенция для печи';
-        previewEl.append(h('span', `→ ${it.emoji} ${label} · +${score} 🪙`));
+        const label = TOOL_USE[c.id] ? '🔨 инструмент' : c.kind === 'item' ? '🎁' : c.kind === 'card' ? CATEGORIES[it.cat].name.toLowerCase() : '✨ в печь';
+        previewEl.append(h('span', `${it.emoji} ${label} · +${score}🪙`));
       }
     }
 
@@ -140,23 +136,9 @@ export function mount(root, ctx) {
         h('span.tile', ch), h('span.n', n), h('span.s', LETTER_SCORE[ch]));
     }));
 
-    renderGoal();
     const ns = nextStage();
-    nextEl.replaceChildren(...(ns ? ['🔓 Новые буквы ', ...[...ns.letters].map((ch) => h('span.tile', ch)), ` — ещё ${Math.max(0, ns.need)} ${plural(ns.need)}`] : []));
+    nextEl.replaceChildren(...(ns ? ['🔒 ', ...[...ns.letters].map((ch) => h('span.tile', ch)), ` через ${Math.max(1, ns.need)} ${plural(Math.max(1, ns.need))}`] : []));
     madeEl.replaceChildren(...made.map((m) => h('div.chip', h('span.chip-emoji', m.emoji), h('span.chip-word', m.word.toLowerCase()))));
-  }
-
-  function renderGoal() {
-    const next = ROOMS.find((r) => !state.rooms[r.id]);
-    if (!next) { goalEl.replaceChildren(h('span', '🏠 Все комнаты открыты!')); return; }
-    const pool = { ...state.letters };
-    goalEl.replaceChildren(
-      h('span', '🏠 Цель:'),
-      h('div.letters-row', [...next.word].map((ch) => {
-        const ok = (pool[ch] || 0) > 0; if (ok) pool[ch]--;
-        return h('span.tile' + (ok ? '' : '.miss'), ch);
-      })),
-    );
   }
 
   function submit() {
@@ -184,7 +166,7 @@ export function mount(root, ctx) {
       if (c.kind === 'item') confetti(innerWidth / 2, innerHeight / 3, 30);
     }
     store.addCoins(coins);
-    toast(`${first ? 'Новое слово! ' : ''}+${coins} 🪙`);
+    toast(`+${coins} 🪙`);
     made.unshift({ word: w, emoji });
     const burst = h('div.er-burst', emoji);
     root.append(burst); setTimeout(() => burst.remove(), 1000);
@@ -198,7 +180,7 @@ export function mount(root, ctx) {
         const m = modal([
           h('div.modal-title', 'Открыты новые буквы!'),
           h('div.letters-row', [...opened].map((ch) => h('span.tile', ch))),
-          h('div.center.small', 'Теперь они будут выпадать в «Блоках». Новые буквы — новые слова и предметы.'),
+
           h('button.btn.btn-big', { onclick: () => m.close() }, 'Ура!'),
         ]);
       }, 700);
