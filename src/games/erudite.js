@@ -7,7 +7,7 @@ import { CARD_WORDS, ESSENCE_WORDS } from '../data/words.js';
 import { ALPHABET } from '../data/letters.js';
 import { dictWords, dictCat } from '../data/dict.js';
 import { isLetterOpen } from '../data/letters.js';
-import { nextStage, checkLetterUnlock, wordsCount } from '../progression.js';
+import { nextStage, checkLetterUnlock, wordsCount, gainXP, WORD_XP } from '../progression.js';
 
 // Что делают инструменты — подсказка прямо в превью слова
 const TOOL_USE = { МОЛОТОК: 'бустер для «Три в ряд»', ЛУПА: 'подсказка в «Поиске»' };
@@ -59,6 +59,10 @@ const CSS = `
 .er-next .tile { width: 20px; height: 24px; font-size: 12px; box-shadow: 0 2px 0 #d9a92e; margin: 0 1px; }
 .er-made { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; min-height: 34px; }
 .er-made .chip { flex: none; animation: pop .3s; }
+.er-flash { position: absolute; inset: 0; z-index: 6; display: flex; align-items: center; justify-content: center; pointer-events: none; animation: er-fl 1.3s forwards; background: radial-gradient(circle, color-mix(in srgb, var(--rar) 55%, transparent), transparent 70%); }
+.er-flash b { font-family: var(--display); font-weight: 900; font-size: 44px; color: var(--rar); -webkit-text-stroke: 2px #111; text-shadow: 0 5px 0 #111; transform: rotate(-6deg); animation: rw-pop .5s cubic-bezier(.2,1.8,.4,1); }
+@keyframes er-fl { 70% { opacity: 1; } to { opacity: 0; } }
+@keyframes rw-pop { from { transform: scale(.2) rotate(-8deg); opacity: 0; } }
 .er-burst { position: absolute; left: 50%; top: 40%; font-size: 90px; transform: translate(-50%,-50%); animation: er-burst 1s forwards; pointer-events: none; z-index: 5; }
 @keyframes er-in { from { transform: scale(.3) translateY(20px); } }
 @keyframes er-shake { 25% { transform: translateX(-8px); } 50% { transform: translateX(8px); } 75% { transform: translateX(-4px); } }
@@ -120,7 +124,8 @@ export function mount(root, ctx) {
       else {
         const it = getItem(c.id);
         const label = TOOL_USE[c.id] ? '🔨 инструмент' : c.kind === 'item' ? '🎁' : c.kind === 'card' ? CATEGORIES[it.cat].name.toLowerCase() : '✨ в печь';
-        previewEl.append(h('span', `${it.emoji} ${label}`));
+        // редкость видна до того, как слово составлено — тянет собирать слова подлиннее
+        previewEl.append(h('span', `${it.emoji} ${label} `), h('span.rar-tag.rar-' + it.rarity, RARITY[it.rarity].name));
       }
     }
 
@@ -164,11 +169,20 @@ export function mount(root, ctx) {
     }
     if (first) toast('✨ Новое слово');
     made.unshift({ word: w, emoji });
-    const burst = h('div.er-burst', emoji);
+    const rar = c.kind === 'room' ? 'l' : getItem(c.id).rarity;
+    const burst = h('div.er-burst.rar-' + rar, emoji);
     root.append(burst); setTimeout(() => burst.remove(), 1000);
+    if (rar === 'e' || rar === 'l') {
+      const flash = h('div.er-flash.rar-' + rar, h('b', rar === 'l' ? 'ЛЕГЕНДА!' : 'ЭПИК!'));
+      root.append(flash); setTimeout(() => flash.remove(), 1300);
+      confetti(innerWidth / 2, innerHeight / 3, rar === 'l' ? 80 : 40);
+    }
+    const br = wordEl.getBoundingClientRect();
+    gainXP((c.kind === 'room' ? 40 : WORD_XP[rar]) * (first ? 2 : 1), { x: br.left + br.width / 2, y: br.top });
     word = [];
     store.commit();
     const opened = checkLetterUnlock();
+    if (opened) gainXP(15);
     render();
     if (opened) {
       setTimeout(() => {
