@@ -5,6 +5,8 @@ import { h, toast } from '../ui/common.js';
 import { state, totalLetters } from '../state.js';
 import { getItem, ITEMS } from '../data/items.js';
 import { questCard } from './quests.js';
+import { dailyCard } from './daily.js';
+import { CHEST_EVERY } from '../progression.js';
 
 const tier1Kinds = () => Object.keys(state.items).filter((id) => getItem(id).tier === 1).length;
 function cardCats() {
@@ -44,6 +46,11 @@ export const GAMES = [
     tip: 'Фишки — твои вещи. Собери цель — получишь ещё.',
   },
   {
+    id: 'merge', title: 'Мердж', emoji: '✨', energy: 0, color: 'yellow', flow: '🎁+🎁 → 💎',
+    takes: 'энергия и вещи', gives: 'редкие вещи', need: () => null,
+    tip: 'Соединяй две одинаковые вещи — получишь вещь круче.',
+  },
+  {
     id: 'hidden', title: 'Поиск', emoji: '🔍', energy: 6, color: 'pink', flow: '⚡ → 🎁',
     takes: 'энергия', gives: 'новые предметы', need: () => null,
     tip: 'Найди на картинке предметы из списка.',
@@ -58,6 +65,7 @@ export function renderGames(root, nav) {
   const found = ITEMS.filter((it) => state.dex?.[it.id]).length;
   root.replaceChildren(h('div.screen.gm-screen',
     questCard(nav, () => renderGames(root, nav)),
+    chestBar(),
     h('div.gm-grid', GAMES.map((g, i) => {
       const need = g.need();
       return h('button.gm-tile.gm-' + g.color + (need ? '.locked' : ''), {
@@ -70,10 +78,21 @@ export function renderGames(root, nav) {
       h('div.gm-flow', need ? '🔒' : flowNodes(g.flow)),
       );
     })),
+    dailyCard(nav, () => renderGames(root, nav)),
     h('button.gm-dex', { onclick: () => { nav.go('bag'); } },
       h('span.gm-dex-ic', '🏆'),
       h('span.gm-dex-t', h('b', 'Коллекция'), h('span', `${found} из ${ITEMS.length}`)),
       h('span.gm-dex-bar', h('i', { style: { width: Math.round((found / ITEMS.length) * 100) + '%' } })),
     ),
   ));
+}
+
+// Полоска «сундук через N партий»: каждая сыгранная партия приближает сундук
+function chestBar() {
+  const n = (state.progress.playCount || 0) % CHEST_EVERY;
+  return h('div.gm-chest',
+    h('span.gm-chest-ic', '💼'),
+    h('span.gm-chest-dots', Array.from({ length: CHEST_EVERY }, (_, i) => h('i' + (i < n ? '.on' : '')))),
+    h('span.gm-chest-t', `сундук через ${CHEST_EVERY - n}`),
+  );
 }
