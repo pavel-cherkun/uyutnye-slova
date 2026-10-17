@@ -357,7 +357,6 @@ export function mount(root, ctx) {
       emoji = getItem(c.id).emoji;
       if (c.kind === 'item') confetti(innerWidth / 2, innerHeight / 3, 30);
     }
-    if (first) toast('✨ Новое слово');
     const rar = c.kind === 'room' ? 'l' : getItem(c.id).rarity;
     made.unshift({ word: w, emoji, rar });
     boardEl.querySelectorAll('.er-mini, .er-mini-t').forEach((e) => e.remove());

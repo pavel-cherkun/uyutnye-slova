@@ -123,6 +123,19 @@ export function sanitizeCells(cells) {
 /** Энергия за продажу */
 export const sellValue = (id) => 1 + (levelOf(id)?.index ?? 0);
 
+// ----- Заряды генераторов: ограничивают «бесплатное» производство вещей -----
+export const GEN_COST = 2;          // энергии за тап
+export const GEN_MAX = 6;           // зарядов в генераторе
+export const GEN_RECHARGE = 15 * 60 * 1000; // мс на один заряд
+/** Текущие заряды генератора с учётом восстановления по времени. g = { charges, at } */
+export function genCharges(g, now = Date.now()) {
+  if (!g) return { charges: GEN_MAX, at: now };
+  if (g.charges >= GEN_MAX) return { charges: GEN_MAX, at: now };
+  const gained = Math.floor((now - g.at) / GEN_RECHARGE);
+  const charges = Math.min(GEN_MAX, g.charges + gained);
+  return { charges, at: charges >= GEN_MAX ? now : g.at + gained * GEN_RECHARGE };
+}
+
 // ---------- Стили ----------
 
 const CSS = `
@@ -141,6 +154,8 @@ const CSS = `
 .mg-gen:nth-child(6n+4) { background:#d4efff; } .mg-gen:nth-child(6n+5) { background:#fff1a8; } .mg-gen:nth-child(6n+6) { background:#ffd4ea; }
 .mg-gen:active { transform:translateY(3px); box-shadow:0 1px 0 var(--ink); }
 .mg-gen-ic { font-size:28px; line-height:1; }
+.mg-gen-ch { font-family: var(--display); font-size: 10px; font-weight: 800; }
+.mg-gen.empty { filter: grayscale(.8); opacity: .65; }
 .mg-gen-cost { position:absolute; right:-6px; top:-7px; font-family:var(--display); font-weight:800; font-size:10px; background:var(--ink); color:var(--lime);
   border-radius:99px; padding:2px 6px; }
 .mg-gen-name { font-size:9px; font-weight:900; text-transform:uppercase; letter-spacing:.3px; margin-top:2px; }
@@ -255,10 +270,22 @@ export function mount(root, ctx) {
   // ----- Генераторы -----
   const gens = h('div.mg-gens', MERGE_CATS.map((cat) => {
     const b = h('button.mg-gen', { 'data-cat': cat },
-      h('span.mg-gen-ic', GEN_ICONS[cat]), h('span.mg-gen-name', GEN_NAMES[cat]), h('span.mg-gen-cost', '1⚡'));
+      h('span.mg-gen-ic', GEN_ICONS[cat]), h('span.mg-gen-name', GEN_NAMES[cat]), h('span.mg-gen-cost', GEN_COST + '⚡'), h('span.mg-gen-ch'));
     b.addEventListener('click', () => generate(cat, b));
     return b;
   }));
+  const genState = () => ((S.progress.merge ||= { cells: [] }).gens ||= {});
+  function updGens() {
+    const now = Date.now();
+    for (const b of gens.children) {
+      const g = genCharges(genState()[b.dataset.cat], now);
+      const ch = b.querySelector('.mg-gen-ch');
+      if (g.charges > 0) { ch.textContent = `${g.charges}/${GEN_MAX}`; b.classList.remove('empty'); }
+      else { ch.textContent = '⏳' + Math.ceil((g.at + GEN_RECHARGE - now) / 60000) + 'м'; b.classList.add('empty'); }
+    }
+  }
+  updGens();
+  const genTimer = setInterval(updGens, 20000);
 
   // ----- Поле -----
   const board = h('div.mg-board');
@@ -333,7 +360,7 @@ export function mount(root, ctx) {
     );
     actions.append(bagBtn,
       h('button.btn.btn-green', { onclick: toBag }, '📦 В сумку'),
-      h('button.btn.btn-yellow', { onclick: sell }, `Продать +${sellValue(id)}⚡`),
+      h('button.btn.btn-ghost', { onclick: sell }, '🗑 Убрать'),
     );
   }
   function select(i) {
@@ -361,16 +388,13 @@ export function mount(root, ctx) {
   function sell() {
     if (sel < 0 || !cells[sel]) return;
     const i = sel, id = cells[i];
-    const n = sellValue(id);
     const at = cellCenter(i);
     cells[i] = null;
     sel = -1;
     renderCell(i);
-    store.addEnergy(n);
+    // без энергии взамен: иначе генератор + продажа = бесконечная энергия
     save();
-    updEnergy();
-    sfx('coin'); buzz(8);
-    floatText(`+${n} ⚡`, at.x, at.y);
+    sfx('tap'); buzz(8);
     renderPanel();
     bump();
   }
@@ -380,9 +404,16 @@ export function mount(root, ctx) {
     bump();
     const free = randomFreeCell(cells);
     if (free < 0) { toast('Поле заполнено — забери что-нибудь в сумку'); sfx('error'); retrigger(btn, 'shake'); return; }
-    if (!store.spendEnergy(1)) {
+    const gs = genState();
+    const g = genCharges(gs[cat]);
+    if (g.charges <= 0) {
+      toast(`Генератор отдыхает — заряд через ${Math.ceil((g.at + GEN_RECHARGE - Date.now()) / 60000)} мин`); sfx('error'); retrigger(btn, 'shake'); return;
+    }
+    if (!store.spendEnergy(GEN_COST)) {
       toast('Нужна ⚡ — сожги лишнее в печи'); sfx('error'); buzz([20, 40, 20]); retrigger(btn, 'shake'); return;
     }
+    gs[cat] = { charges: g.charges - 1, at: g.charges >= GEN_MAX ? Date.now() : g.at };
+    updGens();
     updEnergy();
     cells[free] = spawnId(cat);
     save();
@@ -590,6 +621,7 @@ export function mount(root, ctx) {
   bump();
 
   return () => {
+    clearInterval(genTimer);
     clearTimeout(idleT);
     timers.forEach(clearTimeout);
     ro.disconnect();
