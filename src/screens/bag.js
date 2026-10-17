@@ -16,7 +16,7 @@ const USE_HINT = {
 export function renderBag(root, nav) {
   const rerender = () => renderBag(root, nav);
   const tabs = h('div.seg',
-    seg('items', '🎒 Предметы'), seg('letters', '🔤 Буквы'), seg('words', '📜 Слова'),
+    seg('items', '🎁 Вещи'), seg('letters', [h('span.ltr', 'А'), ' Буквы']), seg('words', '📜 Слова'),
   );
   function seg(id, label) {
     return h('button.seg-btn' + (tab === id ? '.on' : ''), { onclick: () => { tab = id; rerender(); } }, label);
@@ -38,10 +38,10 @@ function lettersView(nav) {
         h('span.tile', ch, h('sub.tile-score', LETTER_SCORE[ch])),
         h('span.bag-letter-n', '×' + n));
     })),
-    h('div.small.muted.center', `Всего букв: ${total}. Буквы падают в «Блоках», а тратятся в «Эрудите».`),
+
     h('div.row',
       h('button.btn.btn-orange', { onclick: () => nav.openGame('shooter') }, '🎯 Добыть'),
-      h('button.btn.btn-violet', { onclick: () => nav.openGame('erudite') }, '🔤 Составить'),
+      h('button.btn.btn-violet', { onclick: () => nav.openGame('erudite') }, '✍️ Составить'),
     ),
   );
 }
@@ -55,9 +55,7 @@ function itemsView(tierGroup, rerender, nav) {
   if (!entries.length) {
     return h('div.card.center.stack',
       h('div', { style: { fontSize: '48px' } }, tierGroup === 1 ? '🎒' : '📜'),
-      h('div.muted', tierGroup === 1
-        ? 'Пока пусто. Предметы дают «Поиск», «Три в ряд» и «Эрудит».'
-        : 'Здесь копятся слова без картинок и эссенции — составляй их в Эрудите. Их можно сжечь в печи или запечь в предметы.'),
+      h('div.muted', 'Пока пусто'),
       h('button.btn', { onclick: () => nav.go('games') }, 'К играм'),
     );
   }
@@ -90,7 +88,7 @@ export function itemMenu(id, rerender, nav) {
     h('div.modal-title', it.word[0] + it.word.slice(1).toLowerCase()),
     h('div.small.muted.center', `${CATEGORIES[it.cat].name} · ${tierName} · в сумке: ${n}`),
     USE_HINT[id] ? h('div.small.center', '🛠 ' + USE_HINT[id]) : null,
-    it.tier === 2 ? h('div.small.center.muted', '3 одинаковые карточки можно запечь в печи в настоящий предмет') : null,
+
     h('div.stack',
       eat ? h('button.btn.btn-green', {
         onclick: () => { removeItem(id); addEnergy(eat); toast(`Ням! +${eat} ⚡`); close(); },

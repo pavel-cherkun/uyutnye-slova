@@ -80,6 +80,7 @@ export function renderCreate(root, done) {
         state.created = true;
         // Стартовый набор: немного букв и предметов, чтобы сразу было во что играть
         state.progress.letterStage = 0;
+        state.progress.createdOn = new Date().toLocaleDateString('sv');
         applyReward(STARTER);
         commit();
         confetti();

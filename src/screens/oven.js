@@ -47,7 +47,7 @@ export function renderOven(root) {
         toast(`🔥 Сгорело ${count} · +${total} ⚡`);
         rerender();
       },
-    }, total ? `Сжечь · +${total} ⚡` : 'Выбери, что сжечь'),
+    }, total ? `🔥 Сжечь · +${total} ⚡` : '👇 Выбери, что сжечь'),
 
     entries.length ? h('div.ov-list', entries.map(({ it, n }) => {
       const sel = selected[it.id] || 0;
@@ -59,18 +59,17 @@ export function renderOven(root) {
       h('span.bag-word', it.word.toLowerCase()),
       h('span.ov-val', '+' + Math.round(burnValue(it.id) * mult)),
       h('span.bag-n', sel ? `${sel}/${n}` : n));
-    })) : h('div.card.small.muted.center', 'Сжигать пока нечего. Составь слова в Эрудите — абстрактные слова (эссенции) отлично горят.'),
+    })) : h('div.card.small.muted.center', 'Пока пусто 🔥'),
 
     h('div.card.stack',
-      h('b', '🥧 Запекание'),
-      h('div.small.muted', '3 одинаковых → 1 предмет получше той же категории. Из карточек-слов получаются настоящие предметы.'),
+      h('b', '🥧 3 одинаковых → 1 получше'),
       bakeable.length ? h('div.ov-bake', bakeable.map((it) =>
         h('button.chip', { onclick: () => bake(it, rerender) }, h('span.chip-emoji', it.emoji), h('span.chip-word', it.word.toLowerCase() + ' ×3'))))
-        : h('div.small', 'Нет троек одинаковых.'),
+        : h('div.small.muted', 'Пока нет троек'),
     ),
 
     h('div.card.row',
-      h('div', h('b', 'Улучшить печь'), h('div.small.muted', state.oven.level >= OVEN_MAX ? 'Максимальный уровень' : `Больше энергии с каждого предмета: ×${1 + 0.25 * state.oven.level}`)),
+      h('div', h('b', '⬆️ Печь'), h('div.small.muted', state.oven.level >= OVEN_MAX ? 'максимум' : `⚡ ×${1 + 0.25 * state.oven.level}`)),
       state.oven.level < OVEN_MAX ? h('button.btn.btn-yellow', {
         style: { flex: 'none' },
         onclick: () => {

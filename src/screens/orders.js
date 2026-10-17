@@ -84,10 +84,10 @@ function reqView(q) {
     emoji = '✨'; label = 'эссенции';
     where = 'Эрудит: абстрактные слова';
   }
-  return h('div.or-req' + (ok ? '.ok' : ''),
+  return h('button.or-req' + (ok ? '.ok' : ''), { onclick: () => toast(ok ? 'Есть ✓' : 'Где взять: ' + where, 2600) },
     h('span.or-req-e', emoji),
-    h('div.or-req-t', h('b', label), h('span.small.muted', ok ? 'есть' : 'где взять: ' + where)),
-    h('span.or-req-n', `${Math.min(n, q.n)}/${q.n}`),
+    h('div.or-req-t', h('b', label)),
+    h('span.or-req-n', ok ? '✓' : `${Math.min(n, q.n)}/${q.n}`),
   );
 }
 
@@ -112,16 +112,14 @@ export function renderOrders(root, nav) {
   const rerender = () => renderOrders(root, nav);
   const list = ensureOrders();
   root.replaceChildren(h('div.screen',
-    h('div.screen-title', 'Заказы соседей'),
-    h('div.small.muted', { style: { margin: '-6px 2px 12px' } },
-      `Соседи просят то, что добывается в разных играх. Выполнено заказов: ${state.progress.ordersDone || 0}`),
+    h('div.screen-title', 'Заказы'),
     h('div.stack', list.map((o, i) => {
       const nb = NEIGHBOURS.find((n) => n.id === o.nb) || NEIGHBOURS[0];
       const ready = o.reqs.every((q) => have(q).n >= q.n);
       return h('div.or-card' + (ready ? '.ready' : ''),
         h('div.or-head', h('span.or-ava', nb.emoji), h('b', nb.name)),
         h('div.or-reqs', o.reqs.map(reqView)),
-        h('div.or-reward', h('span.small.muted', 'Награда:'),
+        h('div.or-reward', h('span', '🎁'),
           o.reward.coins ? h('span.or-rw', `🪙 ${o.reward.coins}`) : null,
           o.reward.keys ? h('span.or-rw', `🗝️ ${o.reward.keys}`) : null,
           o.reward.energy ? h('span.or-rw', `⚡ ${o.reward.energy}`) : null,
@@ -134,8 +132,8 @@ export function renderOrders(root, nav) {
               state.progress.orders[i] = makeOrder(list.filter((_, j) => j !== i).map((x) => x.nb));
               commit(); rerender();
             },
-          }, `🔄 Другой · ${REPLACE_COST}🪙`),
-          h('button.btn.btn-green.btn-sm', { disabled: !ready, style: { boxShadow: '0 3px 0 #1a9c70' }, onclick: () => fulfil(i, rerender) }, ready ? 'Отдать ✓' : 'Не хватает'),
+          }, `🔄 ${REPLACE_COST}🪙`),
+          h('button.btn.btn-green.btn-sm', { disabled: !ready, style: { boxShadow: '0 3px 0 #1a9c70' }, onclick: () => fulfil(i, rerender) }, ready ? 'Отдать ✓' : 'Отдать'),
         ),
       );
     })),

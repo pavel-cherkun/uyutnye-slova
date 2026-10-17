@@ -64,6 +64,7 @@ export function maybeDailyGift(onDone) {
   const p = state.progress;
   const d = today();
   if (p.lastGift === d) return false;
+  if (!p.lastGift && p.createdOn === d) return false; // первый день: без подарка, чтобы не перегружать
   const yesterday = new Date(Date.now() - 864e5).toLocaleDateString('sv');
   p.giftStreak = p.lastGift === yesterday ? Math.min(7, (p.giftStreak || 0) + 1) : 1;
   p.lastGift = d;

@@ -17,11 +17,13 @@ export function roomCozy(roomId) {
 }
 
 export function renderHome(root, nav) {
-  if (!state.rooms[currentRoom]) currentRoom = 'studio';
+  // открытые комнаты + одна следующая закрытая (остальные пока не показываем, чтобы не перегружать)
+  const nextLocked = ROOMS.find((r) => !state.rooms[r.id]);
+  const visible = ROOMS.filter((r) => state.rooms[r.id] || r === nextLocked);
+  if (!visible.some((r) => r.id === currentRoom)) currentRoom = 'studio';
   const room = ROOMS.find((r) => r.id === currentRoom);
   const unlocked = !!state.rooms[room.id];
-
-  const tabs = h('div.hm-tabs', ROOMS.map((r) => {
+  const tabs = h('div.hm-tabs', visible.map((r) => {
     const open = !!state.rooms[r.id];
     return h('button.hm-tab' + (r.id === currentRoom ? '.on' : '') + (open ? '' : '.locked'),
       { onclick: () => { currentRoom = r.id; renderHome(root, nav); } },
@@ -57,11 +59,8 @@ function roomView(room, root, nav) {
 
   const placed = Object.keys(cells).length;
   return h('div.stack',
-    h('div.hm-room', wall, floor, h('div.hm-me', { html: avatarSVG(state.profile, { bg: false }) })),
-    h('div.hm-info',
-      h('div', h('b', room.name), h('span.muted.small', ` · предметов: ${placed} · уют: ${roomCozy(room.id)} 💖`)),
-    ),
-    placed === 0 ? h('div.card.small', 'Нажми на «+», чтобы поставить предмет. Предметы добываются в мини-играх: ищи их в «Поиске», собирай в «Три в ряд», составляй словами в «Эрудите».') : null,
+    h('div.hm-room' + (placed === 0 ? '.hm-empty' : ''), wall, floor, h('div.hm-me', { html: avatarSVG(state.profile, { bg: false }) })),
+    h('div.hm-info', `💖 ${roomCozy(room.id)}`),
   );
 }
 
@@ -76,13 +75,10 @@ function lockedView(room, nav) {
   });
   return h('div.card.stack.center.hm-locked',
     h('div.hm-lock', '🔒'),
-    h('div', 'Комната ', h('b', room.name), ' откроется, когда ты составишь слово'),
     h('div.letters-row', tiles),
-    h('div.small.muted', have ? 'Все буквы есть! Иди в Эрудит.' : 'Тусклые буквы ещё нужно добыть — их дают Блоки.'),
-    h('div.row',
-      h('button.btn.btn-violet', { onclick: () => nav.openGame('erudite') }, '🔤 Эрудит'),
-      h('button.btn.btn-orange', { onclick: () => nav.openGame('shooter') }, '🎯 Блоки'),
-    ),
+    have
+      ? h('button.btn.btn-violet', { onclick: () => nav.openGame('erudite') }, '✍️ Собрать слово')
+      : h('button.btn.btn-orange', { onclick: () => nav.openGame('shooter') }, '🎯 Добыть буквы'),
   );
 }
 
@@ -100,12 +96,9 @@ function pickItem(roomId, key, place, rerender, nav) {
         commit(); m.close(); rerender();
       },
     }, h('span.hm-pick-emoji', it.emoji), h('span.small', it.word.toLowerCase()), n > 1 ? h('span.hm-pick-n', n) : null)))
-    : h('p.muted.center', place === 'wall'
-      ? 'Нет предметов для стены. Картины, зеркала и часы ищи в «Поиске» — локация «Гостиная».'
-      : 'Нет предметов для пола. Сыграй в мини-игры, чтобы добыть мебель, растения и декор.');
+    : h('p.muted.center', place === 'wall' ? 'Пока нечего повесить 🖼️' : 'Пока нечего поставить 🛋️');
   m = modal([
-    h('div.modal-title', place === 'wall' ? 'Повесить на стену' : 'Поставить'),
-    h('div.small.muted.center', place === 'wall' ? CATEGORIES.walldecor.name : 'Мебель, свет, декор, растения, техника, посуда, питомцы…'),
+    h('div.modal-title', place === 'wall' ? '🖼️ На стену' : '🛋️ Поставить'),
     list,
     !owned.length ? h('button.btn', { onclick: () => { m.close(); nav.go('games'); } }, 'К играм') : null,
   ]);
