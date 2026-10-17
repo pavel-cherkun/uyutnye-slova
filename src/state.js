@@ -25,6 +25,8 @@ function defaultState() {
     },
     energy: 25,
     keys: 0,
+    xp: 0,                // опыт игрока → уровень (см. progression.js)
+    dex: {},              // коллекция: id предмета → 1, если когда-либо был найден
     letters: {},          // { 'А': 3, ... }
     items: {},            // { 'ЯБЛОКО': 2, 'card:СЕКРЕТЕР': 1, 'ess:ЛЮБОВЬ': 1 }
     rooms: {
@@ -53,6 +55,7 @@ function migrate(s) {
   // старые сохранения: алфавит уже был открыт целиком
   if (s.created && (s.progress || {}).letterStage === undefined) out.progress.letterStage = 99;
   delete out.coins; // монеты убраны из игры
+  out.dex = s.dex || Object.fromEntries(Object.keys(s.items || {}).map((id) => [id, 1]));
   out.version = SAVE_VERSION;
   return out;
 }
@@ -132,8 +135,18 @@ export function importSave(code) {
 // ---------- Предметы ----------
 export function itemCount(id) { return state.items[id] || 0; }
 
+// Новые для коллекции предметы из последних поступлений (для бейджа «НОВОЕ!» в окне наград)
+export let lastNew = [];
+function markDex(id) {
+  if (state.dex[id]) return false;
+  state.dex[id] = 1;
+  lastNew.push(id);
+  return true;
+}
+
 export function addItem(id, n = 1) {
   state.items[id] = (state.items[id] || 0) + n;
+  markDex(id);
   commit();
 }
 
@@ -199,7 +212,8 @@ export function spendKeys(n) {
  * reward: { items?: {id:n}, letters?: string|{ch:n}, energy?, keys? }
  */
 export function applyReward(reward = {}) {
-  if (reward.items) for (const [id, n] of Object.entries(reward.items)) state.items[id] = (state.items[id] || 0) + n;
+  lastNew = [];
+  if (reward.items) for (const [id, n] of Object.entries(reward.items)) { state.items[id] = (state.items[id] || 0) + n; markDex(id); }
   if (reward.letters) {
     const map = typeof reward.letters === 'string' ? countChars(normWord(reward.letters)) : reward.letters;
     for (const [ch, n] of Object.entries(map)) state.letters[ch] = (state.letters[ch] || 0) + n;

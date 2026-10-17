@@ -13,18 +13,19 @@ import { loadDict } from './data/dict.js';
 import { renderOrders, readyOrders } from './screens/orders.js';
 import { setupDevice } from './ui/device.js';
 import { maybeDailyGift, maybeIosHint } from './screens/settings.js';
-import { syncLetters } from './progression.js';
+import { syncLetters, levelInfo, gainXP } from './progression.js';
 
 const app = document.getElementById('app');
+// «Играть» — большая кнопка по центру меню
 const TABS = [
   { id: 'home', icon: '🏠', label: 'Дом' },
-  { id: 'games', icon: '🎮', label: 'Игры' },
   { id: 'bag', icon: '🎒', label: 'Сумка' },
+  { id: 'games', icon: '▶', label: 'Играть', play: true },
   { id: 'oven', icon: '🔥', label: 'Печь' },
   { id: 'orders', icon: '📋', label: 'Заказы' },
 ];
 
-let current = 'home';
+let current = 'games';
 let hudEl, screenEl, tabbarEl;
 let gameOpen = false;
 
@@ -53,24 +54,32 @@ function renderHud() {
   if (!hudEl) return;
   const vals = { energy: state.energy, keys: state.keys, letters: totalLetters() };
   const pill = (k, ic, title) => {
-    const el = h('div.hud-pill', { title }, ic === 'L' ? h('span.ltr', 'А') : h('span.ic', ic), vals[k]);
+    const el = h('div.hud-pill', { title, 'data-k': k }, ic === 'L' ? h('span.ltr', 'А') : h('span.ic', ic), vals[k]);
     if (prevHud[k] != null && prevHud[k] !== vals[k]) el.classList.add('bump');
     return el;
   };
+  const lv = levelInfo();
   hudEl.replaceChildren(
-    h('button.hud-avatar', { style: { border: 0, padding: 0 }, onclick: () => go('me'), html: avatarSVG(state.profile) }),
-    pill('energy', '⚡', 'Энергия'),
-    pill('keys', '🗝️', 'Ключи'),
-    pill('letters', 'L', 'Буквы'),
-    h('div.hud-spacer'),
-    h('button.btn-icon.hud-gear', { onclick: () => go('me'), 'aria-label': 'Настройки' }, '⚙️'),
+    h('button.hud-me', { onclick: () => go('me'), 'aria-label': 'Профиль' },
+      h('span.hud-ava', { html: avatarSVG(state.profile, { bg: false }) }),
+      h('span.hud-lvlbox',
+        h('span.hud-lvltext', h('span', `УР. ${lv.lvl}`), h('span', `${lv.cur}/${lv.need} ⭐`)),
+        h('span.hud-xp', h('i', { style: { width: Math.round((lv.cur / lv.need) * 100) + '%' } })),
+      ),
+    ),
+    h('div.hud-res',
+      pill('energy', '⚡', 'Энергия'),
+      pill('keys', '🗝️', 'Ключи'),
+      pill('letters', 'L', 'Буквы'),
+    ),
   );
   prevHud = vals;
 }
 
 function renderTabs() {
   tabbarEl.replaceChildren(...TABS.map((t) =>
-    h('button.tab' + (t.id === current ? '.active' : ''), { onclick: () => go(t.id) },
+    h((t.play ? 'button.tab-play' : 'button.tab') + (t.id === current ? '.active' : '') + (t.play && current !== 'games' ? '.pulse' : ''),
+      { onclick: () => go(t.id), 'data-tab': t.id },
       h('span.ic', t.icon), t.label,
       t.id === 'orders' && readyOrders() ? h('span.tab-badge', readyOrders()) : null)));
 }
@@ -154,6 +163,8 @@ async function openGame(id) {
       store.applyReward(reward);
       close();
       showReward(title, reward);
+      // опыт за сыгранную партию: побольше, если были трофеи
+      gainXP(10 + Object.values(reward.items || {}).reduce((a, b) => a + b, 0) * 2, { x: innerWidth / 2, y: innerHeight * 0.3 });
     },
     exit: close,
   };
