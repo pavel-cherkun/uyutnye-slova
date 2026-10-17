@@ -7,17 +7,48 @@ import { lastNew } from '../state.js';
 import { sfx, buzz } from './device.js';
 
 // ---------- Очередь больших окон ----------
+// Ритм: большие окна — только для больших побед, по одному; во время мини-игры они ждут выхода.
 const queue = [];
 let busy = false;
+let held = false;
 export function enqueue(show) {
   queue.push(show);
-  if (!busy) next();
+  if (!busy && !held) next();
 }
 function next() {
+  if (held) { busy = false; return; }
   const show = queue.shift();
   if (!show) { busy = false; return; }
   busy = true;
-  show(() => setTimeout(next, 120));
+  show(() => setTimeout(next, 350));
+}
+/** Придержать большие окна (true) или отпустить накопившиеся (false) */
+export function hold(on) {
+  held = on;
+  if (!on && !busy) next();
+}
+
+/** Лёгкая награда без окна: плашка сверху, значки улетают в шапку. Для мелких побед (задания, испытания). */
+export function quickReward(text, reward = {}) {
+  ensureCss();
+  const parts = [];
+  if (reward.energy) parts.push(`⚡+${reward.energy}`);
+  if (reward.keys) parts.push(`🗝️+${reward.keys}`);
+  const letters = typeof reward.letters === 'string' ? reward.letters.length : 0;
+  if (letters) parts.push(`А+${letters}`);
+  for (const [id, n] of Object.entries(reward.items || {})) parts.push(getItem(id).emoji + (n > 1 ? '×' + n : ''));
+  const el = h('div.qr', h('b', text), h('span', parts.join('  ')));
+  document.body.append(el);
+  sfx('coin'); buzz(12);
+  const r = { x: innerWidth / 2, y: 90 };
+  setTimeout(() => {
+    if (reward.energy) flyTo('⚡', r, '.hud-pill[data-k="energy"]');
+    if (reward.keys) flyTo('🗝️', r, '.hud-pill[data-k="keys"]');
+    if (letters) flyTo('А', r, '.hud-pill[data-k="letters"]');
+    if (reward.items) flyTo('🎁', r, '.tab[data-tab="bag"]');
+  }, 500);
+  setTimeout(() => el.classList.add('out'), 1700);
+  setTimeout(() => el.remove(), 2100);
 }
 
 // ---------- Маленькие победы ----------
@@ -83,6 +114,15 @@ const CSS = `
 @keyframes ch-idle { 50% { transform: scale(var(--s, 1)) rotate(-4deg) translateY(-6px); } }
 @keyframes ch-hit { 25% { transform: scale(calc(var(--s, 1) * 1.15)) rotate(-12deg); } 60% { transform: scale(var(--s, 1)) rotate(10deg); } }
 @keyframes ch-boom { to { transform: scale(2.4); opacity: 0; } }
+.qr { position: fixed; left: 50%; top: calc(64px + env(safe-area-inset-top, 0px)); z-index: 350; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 2px;
+  background: var(--ink); color: #fff; border: 2.5px solid var(--lime); border-radius: 20px; padding: 8px 18px; box-shadow: 0 5px 0 #000; pointer-events: none;
+  animation: rw-pop .4s cubic-bezier(.2,1.8,.4,1); transition: opacity .35s, transform .35s; max-width: 90vw; }
+.qr b { font-family: var(--display); font-size: 14px; color: var(--lime); text-transform: uppercase; }
+.qr span { font-weight: 900; font-size: 16px; }
+.qr.out { opacity: 0; transform: translate(-50%, -14px); }
+.lv-sm { padding: 10px 22px 6px; border-radius: 28px; }
+.lv-sm b { font-size: 56px; }
+.lv-sm small { font-size: 11px; }
 .lv-big { position: relative; font-family: var(--display); font-weight: 900; color: var(--ink); background: var(--lime); border: 4px solid var(--ink);
   border-radius: 40px; box-shadow: 0 8px 0 #000; padding: 18px 28px 12px; text-align: center; animation: rw-pop .6s cubic-bezier(.2,1.8,.4,1); }
 .lv-big small { display: block; font-size: 14px; letter-spacing: 3px; }
@@ -107,7 +147,7 @@ function countUp(el, to, prefix = '+') {
 }
 
 /** Окно наград. reward: { items, letters, energy, keys }. Новые для коллекции предметы помечаются «НОВОЕ!». */
-export function revealReward(title, reward = {}, onClose) {
+export function revealReward(title, reward = {}, onClose, opts = {}) {
   const fresh = new Set(lastNew);
   enqueue((done) => {
     ensureCss();
@@ -126,7 +166,8 @@ export function revealReward(title, reward = {}, onClose) {
     const grid = h('div.rw-grid');
     const lettersEl = h('div.rw-letters', [...letters].sort().map((ch) => h('span.tile', ch)));
     const btn = h('button.btn.btn-big.rw-btn', 'Забрать');
-    const back = h('div.rw-back' + (best === 'l' ? '.gold' : ''), h('div.rw-rays'), h('div.rw-title', title), grid, letters ? lettersEl : null,
+    const lvl = opts.level ? h('div.lv-big.lv-sm', h('small', 'НОВЫЙ УРОВЕНЬ'), h('b', String(opts.level))) : null;
+    const back = h('div.rw-back' + (best === 'l' || opts.level ? '.gold' : ''), h('div.rw-rays'), lvl, h('div.rw-title', title), grid, letters ? lettersEl : null,
       !cards.length && !letters ? h('div.rw-empty', 'В этот раз без трофеев') : null, btn);
     document.body.append(back);
 
@@ -198,23 +239,8 @@ export function openChest(title, tier, reward, onClose) {
   });
 }
 
-/** Большая победа: новый уровень */
+/** Большая победа: новый уровень — одно окно с подарком */
 export function celebrateLevel(level, reward, onClose) {
-  enqueue((done) => {
-    ensureCss();
-    const back = h('div.rw-back.gold', h('div.rw-rays'),
-      h('div.lv-big', h('small', 'УРОВЕНЬ'), h('b', String(level))),
-      h('div.rw-title', 'Новый уровень!'));
-    const btn = h('button.btn.btn-big.rw-btn', 'Ура!');
-    setTimeout(() => btn.classList.add('show'), 600);
-    back.append(btn);
-    document.body.append(back);
-    sfx('reward'); buzz([20, 60, 20, 60, 40]);
-    for (let i = 0; i < 4; i++) setTimeout(() => confetti(innerWidth * (0.2 + Math.random() * 0.6), innerHeight * 0.35, 50), i * 250);
-    btn.addEventListener('click', () => {
-      back.remove();
-      done();
-      revealReward(`Подарок за уровень ${level}`, reward, onClose);
-    });
-  });
+  buzz([20, 60, 20, 60, 40]);
+  revealReward('Подарок за уровень', reward, onClose, { level });
 }

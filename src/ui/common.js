@@ -78,8 +78,8 @@ export function rewardChips(reward = {}) {
   return out;
 }
 
-export function showReward(title, reward, onClose) {
-  return revealReward(title, reward, onClose);
+export function showReward(title, reward, onClose, opts) {
+  return revealReward(title, reward, onClose, opts);
 }
 
 export function confirmDialog(text, yesLabel = 'Да') {
