@@ -5,7 +5,7 @@ import { h, toast } from '../ui/common.js';
 import { state, commit, applyReward } from '../state.js';
 import { chestReward, gainXP } from '../progression.js';
 import { showReward } from '../ui/common.js';
-import { openChest } from '../ui/fx.js';
+import { openChest, quickReward } from '../ui/fx.js';
 
 const plays = (id) => state.stats.plays?.[id] || 0;
 const totalWords = () => Object.values(state.progress.wordsMade).reduce((a, b) => a + b, 0);
@@ -82,7 +82,8 @@ export function dailyCard(nav, rerender) {
           t.claimed = true;
           const r = { energy: 5, letters: 'АОЕ' };
           applyReward(r); commit();
-          showReward('Испытание выполнено!', r, rerender);
+          quickReward('Испытание выполнено!', r);
+          rerender();
           gainXP(15);
         },
       },

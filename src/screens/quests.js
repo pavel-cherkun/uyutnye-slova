@@ -4,6 +4,7 @@ import { h, confetti, showReward } from '../ui/common.js';
 import { state, commit, applyReward } from '../state.js';
 import { getItem } from '../data/items.js';
 import { gainXP } from '../progression.js';
+import { quickReward } from '../ui/fx.js';
 
 const plays = (id) => state.stats.plays?.[id] || 0;
 const placed = () => Object.values(state.rooms).reduce((n, r) => n + Object.keys(r.cells).length, 0);
@@ -19,14 +20,14 @@ function cardCats() {
 // Сначала добыча (буквы, первые слова, первые находки), потом крафт (инструменты, пасьянс, комнаты).
 export const QUESTS = [
   { id: 'q1', icon: '🎯', text: 'Сыграй в Блоки', go: 'shooter', done: () => plays('shooter') >= 1, reward: { energy: 7, letters: 'АОЕИ' } },
-  { id: 'q2', icon: '✍️', text: 'Собери слово КОТ', go: 'erudite', done: () => words() >= 1, reward: { energy: 10 } },
+  { id: 'q2', icon: '✍️', text: 'Собери слово КОТ', go: 'erudite', done: () => made('КОТ'), reward: { energy: 10 } },
   { id: 'q3', icon: '🏠', text: 'Поставь кота дома', tab: 'home', done: () => placed() >= 1, reward: { energy: 5, letters: 'СТОЛ' } },
   { id: 'q4', icon: '✍️', text: 'Собери 3 слова', go: 'erudite', done: () => words() >= 3, reward: { energy: 7 } },
   { id: 'q5', icon: '🔍', text: 'Сыграй в Поиск', go: 'hidden', done: () => plays('hidden') >= 1, reward: { energy: 8 } },
   { id: 'q6', icon: '🔨', text: 'Собери слово МОЛОТОК', go: 'erudite', done: () => made('МОЛОТОК') || state.items['МОЛОТОК'] > 0, reward: { energy: 10 } },
   { id: 'q7', icon: '🍬', text: 'Пройди Три в ряд', go: 'match3', done: () => state.progress.match3Level >= 2, reward: { energy: 7 } },
-  { id: 'q8', icon: '📜', text: 'Собери СТОЛ и ПОЛКА', go: 'erudite', done: () => cardCats() >= 1, reward: { energy: 6, letters: 'РОЗАПИОН' } },
-  { id: 'q8b', icon: '🌹', text: 'Собери РОЗА и ПИОН', go: 'erudite', done: () => cardCats() >= 2, reward: { energy: 6 } },
+  { id: 'q8', icon: '📜', text: 'Собери СТОЛ и ПОЛКА', go: 'erudite', done: () => made('СТОЛ') && made('ПОЛКА'), reward: { energy: 6, letters: 'РОЗАПИОН' } },
+  { id: 'q8b', icon: '🌹', text: 'Собери РОЗА и ПИОН', go: 'erudite', done: () => made('РОЗА') && made('ПИОН'), reward: { energy: 6 } },
   { id: 'q9', icon: '🃏', text: 'Сыграй в Пасьянс', go: 'solitaire', done: () => plays('solitaire') >= 1, reward: { energy: 8 } },
   { id: 'q10', icon: '🔥', text: 'Сожги что-нибудь в печи', tab: 'oven', done: () => state.oven.burned >= 1, reward: { energy: 8 } },
   { id: 'q11', icon: '🔍', text: 'Собери слово ЛУПА', go: 'erudite', done: () => made('ЛУПА') || state.items['ЛУПА'] > 0, reward: { energy: 7 } },
@@ -61,7 +62,7 @@ function claim(q, rerender) {
   (state.progress.questsClaimed ||= []).push(q.id);
   applyReward(q.reward);
   commit();
-  confetti();
-  showReward('Задание выполнено!', q.reward, rerender);
+  quickReward('Задание выполнено!', q.reward);
+  rerender();
   gainXP(20);
 }

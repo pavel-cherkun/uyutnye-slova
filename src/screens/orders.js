@@ -5,6 +5,7 @@ import { state, commit, removeItem, applyReward, spendEnergy } from '../state.js
 import { ITEMS, CATEGORIES, getItem, RARITY } from '../data/items.js';
 import { CARD_WORDS } from '../data/words.js';
 import { gainXP } from '../progression.js';
+import { quickReward } from '../ui/fx.js';
 
 const NEIGHBOURS = [
   { id: 'cook', emoji: '👩‍🍳', name: 'Повариха Мила', cats: ['food', 'dishes', 'drinks'] },
@@ -104,8 +105,8 @@ function fulfil(idx, rerender) {
   state.progress.ordersDone = (state.progress.ordersDone || 0) + 1;
   applyReward(o.reward);
   commit();
-  confetti();
-  showReward('Заказ выполнен!', o.reward, rerender);
+  quickReward('Заказ выполнен!', o.reward);
+  rerender();
   gainXP(25);
 }
 
