@@ -37,8 +37,16 @@ export const CATEGORIES = {
 export const RARITY = {
   c: { name: 'Обычный', color: '#7bc96f', burn: 2 },
   r: { name: 'Редкий',  color: '#4aa8ff', burn: 4 },
-  e: { name: 'Эпик',    color: '#c06bff', burn: 8 },
+  e: { name: 'Эпик',    color: '#b46bff', burn: 8 },
+  l: { name: 'Легенда', color: '#ffb000', burn: 16 },
 };
+export const RARITY_ORDER = ['c', 'r', 'e', 'l'];
+
+/** Редкость слова-карточки по длине: длинные слова круче */
+export function wordRarity(word) {
+  const n = word.length;
+  return n >= 9 ? 'l' : n >= 7 ? 'e' : n >= 5 ? 'r' : 'c';
+}
 
 // СЛОВО эмодзи категория редкость
 const TABLE = `
@@ -101,7 +109,7 @@ const TABLE = `
 БОКАЛ 🥂 dishes r
 СОЛОНКА 🧂 dishes c
 ГИТАРА 🎸 music r
-ПИАНИНО 🎹 music e
+ПИАНИНО 🎹 music l
 СКРИПКА 🎻 music r
 БАРАБАН 🥁 music c
 ТРУБА 🎺 music c
@@ -211,11 +219,11 @@ const TABLE = `
 ЛУНА 🌙 nature r
 ЗВЕЗДА ⭐ nature r
 СОЛНЦЕ ☀️ nature r
-РАДУГА 🌈 nature e
+РАДУГА 🌈 nature l
 СНЕЖИНКА ❄️ nature c
 ЛИСТ 🍁 nature c
 ПЕРО 🪶 nature c
-АЛМАЗ 💎 nature e
+АЛМАЗ 💎 nature l
 БАБОЧКА 🦋 nature r
 ПЧЕЛА 🐝 nature c
 ЖУК 🐞 nature c
@@ -238,10 +246,10 @@ const TABLE = `
 ЛЫЖИ 🎿 sport r
 КУБОК 🏆 sport e
 МЕДАЛЬ 🏅 sport r
-ЕДИНОРОГ 🦄 fantasy e
-ДРАКОН 🐉 fantasy e
+ЕДИНОРОГ 🦄 fantasy l
+ДРАКОН 🐉 fantasy l
 ФЕЯ 🧚 fantasy e
-КОРОНА 👑 fantasy e
+КОРОНА 👑 fantasy l
 КРИСТАЛЛ 🔮 fantasy r
 ПАЛОЧКА 🪄 fantasy r
 ЗАМОК 🏰 fantasy e
@@ -261,11 +269,11 @@ export function getItem(id) {
     const word = id.slice(5);
     let cat = CARD_WORDS[word] || dictCat(word) || 'misc';
     if (!CATEGORIES[cat] || cat === 'essence') cat = 'misc';
-    return { id, word, emoji: CATEGORIES[cat].icon, cat, rarity: 'c', tier: 2 };
+    return { id, word, emoji: CATEGORIES[cat].icon, cat, rarity: wordRarity(word), tier: 2 };
   }
   if (id.startsWith('ess:')) {
     const word = id.slice(4);
-    return { id, word, emoji: '✨', cat: 'essence', rarity: 'c', tier: 3 };
+    return { id, word, emoji: '✨', cat: 'essence', rarity: wordRarity(word), tier: 3 };
   }
   return { id, word: id, emoji: '❓', cat: 'misc', rarity: 'c', tier: 2 };
 }
@@ -275,7 +283,7 @@ export function itemsByCat(cat) { return ITEMS.filter((it) => it.cat === cat); }
 /** Сколько энергии даёт предмет, если сжечь его в печи (без учёта уровня печи). */
 export function burnValue(id) {
   const it = getItem(id);
-  if (it.tier === 3) return 1;
+  if (it.tier === 3) return 1 + RARITY_ORDER.indexOf(it.rarity);
   if (it.tier === 2) return 1 + Math.floor(it.word.length / 4);
   return RARITY[it.rarity].burn;
 }
@@ -284,7 +292,7 @@ export function burnValue(id) {
 export function eatValue(id) {
   const it = getItem(id);
   if (it.tier !== 1 || CATEGORIES[it.cat].use !== 'eat') return null;
-  return { c: 4, r: 7, e: 12 }[it.rarity];
+  return { c: 4, r: 7, e: 12, l: 20 }[it.rarity];
 }
 
 export function isPlaceable(id) {
