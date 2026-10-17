@@ -55,18 +55,25 @@ export const gameIcon = (e) => (e === 'L' ? h('span.ltr.ltr-big', 'А') : e);
 export const flowNodes = (flow) => flow.split(' ').map((t, i) => [i ? ' ' : '', t === 'L' ? h('span.ltr', 'А') : t]);
 
 export function renderGames(root, nav) {
-  root.replaceChildren(h('div.screen',
+  const found = ITEMS.filter((it) => state.dex?.[it.id]).length;
+  root.replaceChildren(h('div.screen.gm-screen',
     questCard(nav, () => renderGames(root, nav)),
-    h('div.gm-grid', GAMES.map((g) => {
+    h('div.gm-grid', GAMES.map((g, i) => {
       const need = g.need();
       return h('button.gm-tile.gm-' + g.color + (need ? '.locked' : ''), {
+        style: { animationDelay: i * 60 + 'ms' },
         onclick: () => (need ? toast(need, 2600) : nav.openGame(g.id)),
       },
-      g.energy ? h('div.gm-cost', `⚡${g.energy}`) : null,
+      g.energy ? h('div.gm-cost', `⚡${g.energy}`) : h('div.gm-cost.free', 'FREE'),
       h('div.gm-big', gameIcon(g.emoji)),
       h('div.gm-name', g.title),
       h('div.gm-flow', need ? '🔒' : flowNodes(g.flow)),
       );
     })),
+    h('button.gm-dex', { onclick: () => { nav.go('bag'); } },
+      h('span.gm-dex-ic', '🏆'),
+      h('span.gm-dex-t', h('b', 'Коллекция'), h('span', `${found} из ${ITEMS.length}`)),
+      h('span.gm-dex-bar', h('i', { style: { width: Math.round((found / ITEMS.length) * 100) + '%' } })),
+    ),
   ));
 }

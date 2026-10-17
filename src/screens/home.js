@@ -4,6 +4,7 @@ import { h, toast, modal } from '../ui/common.js';
 import { state, commit, addItem, removeItem, canSpell } from '../state.js';
 import { ROOMS, getItem, placeOf, RARITY, CATEGORIES } from '../data/items.js';
 import { avatarSVG } from '../ui/avatar.js';
+import { gainXP } from '../progression.js';
 
 const WALL_SLOTS = 5;
 const FLOOR_COLS = 5;
@@ -94,6 +95,7 @@ function pickItem(roomId, key, place, rerender, nav) {
         if (!removeItem(it.id)) return;
         state.rooms[roomId].cells[key] = it.id;
         commit(); m.close(); rerender();
+        gainXP(3 + RARITY[it.rarity].burn, { x: innerWidth / 2, y: innerHeight * 0.4 });
       },
     }, h('span.hm-pick-emoji', it.emoji), h('span.small', it.word.toLowerCase()), n > 1 ? h('span.hm-pick-n', n) : null)))
     : h('p.muted.center', place === 'wall' ? 'Пока нечего повесить 🖼️' : 'Пока нечего поставить 🛋️');

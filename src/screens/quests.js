@@ -3,6 +3,7 @@
 import { h, confetti, showReward } from '../ui/common.js';
 import { state, commit, applyReward } from '../state.js';
 import { getItem } from '../data/items.js';
+import { gainXP } from '../progression.js';
 
 const plays = (id) => state.stats.plays?.[id] || 0;
 const placed = () => Object.values(state.rooms).reduce((n, r) => n + Object.keys(r.cells).length, 0);
@@ -62,4 +63,5 @@ function claim(q, rerender) {
   commit();
   confetti();
   showReward('Задание выполнено!', q.reward, rerender);
+  gainXP(20);
 }

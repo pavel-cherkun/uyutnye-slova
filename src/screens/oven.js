@@ -3,6 +3,7 @@
 import { h, toast, confetti, showReward, pick } from '../ui/common.js';
 import { state, commit, removeItem, addEnergy, spendKeys, applyReward, MAX_ENERGY } from '../state.js';
 import { getItem, burnValue, RARITY, ITEMS, itemsByCat } from '../data/items.js';
+import { gainXP } from '../progression.js';
 
 export const OVEN_MAX = 5;
 export function ovenMult() { return 1 + 0.25 * (state.oven.level - 1); }
@@ -20,7 +21,7 @@ export function renderOven(root) {
   const total = Math.round(Object.entries(selected).reduce((s, [id, n]) => s + burnValue(id) * n, 0) * mult);
 
   const bakeable = Object.entries(state.items).filter(([, n]) => n >= 3).map(([id]) => getItem(id))
-    .filter((it) => it.tier === 2 || (it.tier === 1 && it.rarity !== 'e'));
+    .filter((it) => it.tier === 2 || (it.tier === 1 && it.rarity !== 'l'));
 
   root.replaceChildren(h('div.screen',
     h('div.screen-title', 'Печь'),
@@ -43,6 +44,7 @@ export function renderOven(root) {
         selected = {};
         state.oven.burned += count;
         addEnergy(total);
+        gainXP(count, { x: innerWidth / 2, y: 240 });
         confetti(innerWidth / 2, 260, 24);
         toast(`🔥 Сгорело ${count} · +${total} ⚡`);
         rerender();
@@ -88,7 +90,7 @@ function bake(it, rerender) {
     pool = itemsByCat(it.cat);
     if (!pool.length) pool = ITEMS;
   } else {
-    const next = it.rarity === 'c' ? 'r' : 'e';
+    const next = { c: 'r', r: 'e', e: 'l' }[it.rarity];
     pool = itemsByCat(it.cat).filter((x) => x.rarity === next);
     if (!pool.length) pool = ITEMS.filter((x) => x.rarity === next);
   }

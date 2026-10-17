@@ -4,6 +4,7 @@ import { h, toast, confetti, showReward, pick } from '../ui/common.js';
 import { state, commit, removeItem, applyReward, spendEnergy } from '../state.js';
 import { ITEMS, CATEGORIES, getItem, RARITY } from '../data/items.js';
 import { CARD_WORDS } from '../data/words.js';
+import { gainXP } from '../progression.js';
 
 const NEIGHBOURS = [
   { id: 'cook', emoji: '👩‍🍳', name: 'Повариха Мила', cats: ['food', 'dishes', 'drinks'] },
@@ -105,6 +106,7 @@ function fulfil(idx, rerender) {
   commit();
   confetti();
   showReward('Заказ выполнен!', o.reward, rerender);
+  gainXP(25);
 }
 
 export function renderOrders(root, nav) {

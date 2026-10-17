@@ -1,8 +1,9 @@
 // Сумка: предметы по категориям, буквы, слова. Действия с предметом: съесть, сжечь, поставить.
 
-import { h, toast, modal } from '../ui/common.js';
-import { state, removeItem, addEnergy } from '../state.js';
-import { getItem, CATEGORIES, RARITY, eatValue, burnValue, isPlaceable } from '../data/items.js';
+import { h, toast, modal, showReward, confetti } from '../ui/common.js';
+import { state, removeItem, addEnergy, applyReward, commit } from '../state.js';
+import { getItem, CATEGORIES, RARITY, ITEMS, itemsByCat, eatValue, burnValue, isPlaceable } from '../data/items.js';
+import { gainXP } from '../progression.js';
 import { ALPHABET } from '../data/letters.js';
 import { ovenMult } from './oven.js';
 
@@ -16,7 +17,7 @@ const USE_HINT = {
 export function renderBag(root, nav) {
   const rerender = () => renderBag(root, nav);
   const tabs = h('div.seg',
-    seg('items', '🎁 Вещи'), seg('letters', [h('span.ltr', 'А'), ' Буквы']), seg('words', '📜 Слова'),
+    seg('items', '🎁'), seg('dex', '🏆'), seg('letters', h('span.ltr', 'А')), seg('words', '📜'),
   );
   function seg(id, label) {
     return h('button.seg-btn' + (tab === id ? '.on' : ''), { onclick: () => { tab = id; rerender(); } }, label);
@@ -24,6 +25,7 @@ export function renderBag(root, nav) {
 
   let body;
   if (tab === 'letters') body = lettersView(nav);
+  else if (tab === 'dex') body = dexView(rerender);
   else body = itemsView(tab === 'items' ? 1 : 2, rerender, nav);
 
   root.replaceChildren(h('div.screen', h('div.screen-title', 'Сумка'), tabs, body));
@@ -99,4 +101,39 @@ export function itemMenu(id, rerender, nav) {
       }, `Сжечь в печи · +${burn} ⚡`),
     ),
   ]);
+}
+
+// ---------- Коллекция: альбом по категориям ----------
+function dexReward(cat) {
+  const pool = ITEMS.filter((it) => it.rarity === 'e' || it.rarity === 'l');
+  return { energy: 25, keys: 1, items: { [pool[Math.floor(Math.random() * pool.length)].id]: 1 } };
+}
+
+function dexView(rerender) {
+  const dex = state.dex || {};
+  const claimed = (state.progress.dexClaimed ||= []);
+  const cats = Object.keys(CATEGORIES).filter((c) => itemsByCat(c).length);
+  const total = ITEMS.length, found = ITEMS.filter((it) => dex[it.id]).length;
+  return h('div.stack',
+    h('div.dx-head', h('b', `${found}/${total}`), h('div.gm-dex-bar', h('i', { style: { width: Math.round((found / total) * 100) + '%' } }))),
+    ...cats.map((cat) => {
+      const its = itemsByCat(cat);
+      const n = its.filter((it) => dex[it.id]).length;
+      const full = n === its.length;
+      const canClaim = full && !claimed.includes(cat);
+      return h('div.dx-cat' + (full ? '.full' : ''),
+        h('div.dx-cat-h', h('span', CATEGORIES[cat].icon + ' ' + CATEGORIES[cat].name), h('span.dx-n', `${n}/${its.length}`)),
+        h('div.dx-grid', its.map((it) => h('div.dx-it.rar-' + it.rarity + (dex[it.id] ? '' : '.unk'), dex[it.id] ? it.emoji : h('span', it.emoji)))),
+        canClaim ? h('button.btn.btn-sm.dx-claim', {
+          onclick: () => {
+            claimed.push(cat);
+            const r = dexReward(cat);
+            applyReward(r); commit(); confetti();
+            showReward(`Собрано: ${CATEGORIES[cat].name}!`, r, rerender);
+            gainXP(50);
+          },
+        }, '🏆 Забрать награду') : null,
+      );
+    }),
+  );
 }
