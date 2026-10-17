@@ -79,10 +79,9 @@ export function flyTo(emoji, from, selector) {
 const CSS = `
 .rw-back { position: fixed; inset: 0; z-index: 300; background: rgba(10,10,12,.78); display: flex; flex-direction: column;
   align-items: center; justify-content: center; padding: 24px 18px; gap: 18px; animation: fade .2s; overflow: hidden; }
-.rw-rays { position: absolute; width: 900px; height: 900px; left: 50%; top: 42%; margin: -450px 0 0 -450px; pointer-events: none; opacity: .5;
-  background: repeating-conic-gradient(from 0deg, rgba(200,255,46,.35) 0 10deg, transparent 10deg 20deg); animation: rw-spin 14s linear infinite;
-  -webkit-mask: radial-gradient(circle, #000 0 25%, transparent 60%); mask: radial-gradient(circle, #000 0 25%, transparent 60%); }
-.rw-back.gold .rw-rays { background: repeating-conic-gradient(from 0deg, rgba(255,176,0,.55) 0 10deg, transparent 10deg 20deg); opacity: .8; }
+.rw-rays { position: absolute; width: 640px; height: 640px; left: 50%; top: 40%; margin: -320px 0 0 -320px; pointer-events: none; opacity: .35; border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, rgba(200,255,46,.5) 0 10deg, transparent 10deg 20deg); animation: rw-spin 20s linear infinite; will-change: transform; }
+.rw-back.gold .rw-rays { background: repeating-conic-gradient(from 0deg, rgba(255,176,0,.6) 0 10deg, transparent 10deg 20deg); opacity: .5; }
 .rw-title { position: relative; font-family: var(--display); font-weight: 900; font-size: 30px; color: var(--lime); text-align: center;
   text-transform: uppercase; letter-spacing: -1px; text-shadow: 0 4px 0 #000; animation: rw-pop .5s cubic-bezier(.2,1.8,.4,1); }
 .rw-grid { position: relative; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-width: 420px; }
@@ -96,7 +95,7 @@ const CSS = `
 .rw-card .band { align-self: stretch; margin-top: auto; height: 10px; background: var(--rar, var(--lime)); border-top: 2px solid var(--ink); }
 .rw-card.rar-e { box-shadow: 0 5px 0 var(--ink), 0 0 22px 4px rgba(180,107,255,.75); }
 .rw-card.rar-l { box-shadow: 0 5px 0 var(--ink), 0 0 30px 8px rgba(255,176,0,.9); }
-.rw-card.rar-l.in { animation: rw-flipin .55s cubic-bezier(.2,1.6,.4,1), rw-glow 1.2s .55s infinite; }
+.rw-card.rar-l.in { animation: rw-flipin .55s cubic-bezier(.2,1.6,.4,1); }
 .rw-new { position: absolute; top: 4px; right: -22px; transform: rotate(35deg); background: var(--pink); color: #fff; font-size: 9px; font-weight: 900;
   padding: 2px 24px; border-top: 2px solid var(--ink); border-bottom: 2px solid var(--ink); }
 .rw-letters { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; max-width: 320px; }
@@ -107,7 +106,7 @@ const CSS = `
 @keyframes rw-show { to { opacity: 1; } }
 .rw-empty { color: #fff; font-weight: 800; }
 .ch-box { position: relative; font-size: 120px; line-height: 1; border: 0; background: none; cursor: pointer; transform: scale(var(--s, 1));
-  filter: drop-shadow(0 10px 0 rgba(0,0,0,.4)); animation: ch-idle 1.2s ease-in-out infinite; transition: transform .15s; }
+  animation: ch-idle 1.2s ease-in-out infinite; transition: transform .15s; }
 .ch-box.hit { animation: ch-hit .35s; }
 .ch-box.boom { animation: ch-boom .45s forwards; }
 .ch-hint { position: relative; font-family: var(--display); font-weight: 900; font-size: 22px; color: #fff; text-transform: uppercase; animation: hud-bump 1s infinite; min-height: 28px; }

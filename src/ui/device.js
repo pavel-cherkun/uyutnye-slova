@@ -30,8 +30,13 @@ export function exitFullscreen() {
 }
 
 // Полный экран можно включить только по жесту пользователя — делаем это на первом тапе.
+// Пробуем один раз за сессию: повторные запросы на каждое касание дёргают размер экрана
+// прямо во время нажатия, и тап теряется.
+let fsTried = false;
 function autoFullscreen() {
-  if (state.settings.fullscreen && state.created && !isStandalone() && !isFullscreen()) enterFullscreen();
+  if (fsTried || !state.settings.fullscreen || !state.created || isStandalone() || isFullscreen()) return;
+  fsTried = true;
+  enterFullscreen();
 }
 
 // ---------- Установка (Android/Chrome) ----------
