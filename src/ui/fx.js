@@ -57,29 +57,40 @@ const CSS = `
 .rw-grid { position: relative; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-width: 420px; }
 .rw-card { width: 92px; min-height: 112px; background: #fff; border: 3px solid var(--ink); border-radius: 18px; box-shadow: 0 5px 0 var(--ink);
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 8px 4px 0; position: relative; overflow: hidden;
-  opacity: 0; transform: rotateY(90deg) scale(.6); }
-.rw-card.in { animation: rw-flip .55s cubic-bezier(.2,1.6,.4,1) forwards; }
+  visibility: hidden; }
+.rw-card.in { visibility: visible; animation: rw-flipin .55s cubic-bezier(.2,1.6,.4,1); }
 .rw-card .e { font-size: 40px; line-height: 1.1; }
 .rw-card .w { font-weight: 900; font-size: 11px; text-align: center; padding: 0 4px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rw-card .n { font-family: var(--display); font-weight: 900; font-size: 16px; }
 .rw-card .band { align-self: stretch; margin-top: auto; height: 10px; background: var(--rar, var(--lime)); border-top: 2px solid var(--ink); }
 .rw-card.rar-e { box-shadow: 0 5px 0 var(--ink), 0 0 22px 4px rgba(180,107,255,.75); }
-.rw-card.rar-l { box-shadow: 0 5px 0 var(--ink), 0 0 30px 8px rgba(255,176,0,.9); animation-name: rw-flip, rw-glow; animation-duration: .55s, 1.2s; animation-delay: 0s, .55s; animation-iteration-count: 1, infinite; animation-fill-mode: forwards, none; }
+.rw-card.rar-l { box-shadow: 0 5px 0 var(--ink), 0 0 30px 8px rgba(255,176,0,.9); }
+.rw-card.rar-l.in { animation: rw-flipin .55s cubic-bezier(.2,1.6,.4,1), rw-glow 1.2s .55s infinite; }
 .rw-new { position: absolute; top: 4px; right: -22px; transform: rotate(35deg); background: var(--pink); color: #fff; font-size: 9px; font-weight: 900;
   padding: 2px 24px; border-top: 2px solid var(--ink); border-bottom: 2px solid var(--ink); }
 .rw-letters { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; max-width: 320px; }
-.rw-letters .tile { opacity: 0; transform: translateY(-30px); }
-.rw-letters .tile.in { animation: rw-drop .4s cubic-bezier(.2,1.6,.4,1) forwards; }
-.rw-btn { position: relative; min-width: 220px; font-family: var(--display); font-size: 18px; text-transform: uppercase; opacity: 0; animation: fade .3s forwards; }
+.rw-letters .tile { visibility: hidden; }
+.rw-letters .tile.in { visibility: visible; animation: rw-dropin .4s cubic-bezier(.2,1.6,.4,1); }
+.rw-btn { position: relative; z-index: 2; min-width: 220px; font-family: var(--display); font-size: 18px; text-transform: uppercase; visibility: hidden; }
+.rw-btn.show { visibility: visible; }
+@keyframes rw-show { to { opacity: 1; } }
 .rw-empty { color: #fff; font-weight: 800; }
+.ch-box { position: relative; font-size: 120px; line-height: 1; border: 0; background: none; cursor: pointer; transform: scale(var(--s, 1));
+  filter: drop-shadow(0 10px 0 rgba(0,0,0,.4)); animation: ch-idle 1.2s ease-in-out infinite; transition: transform .15s; }
+.ch-box.hit { animation: ch-hit .35s; }
+.ch-box.boom { animation: ch-boom .45s forwards; }
+.ch-hint { position: relative; font-family: var(--display); font-weight: 900; font-size: 22px; color: #fff; text-transform: uppercase; animation: hud-bump 1s infinite; min-height: 28px; }
+@keyframes ch-idle { 50% { transform: scale(var(--s, 1)) rotate(-4deg) translateY(-6px); } }
+@keyframes ch-hit { 25% { transform: scale(calc(var(--s, 1) * 1.15)) rotate(-12deg); } 60% { transform: scale(var(--s, 1)) rotate(10deg); } }
+@keyframes ch-boom { to { transform: scale(2.4); opacity: 0; } }
 .lv-big { position: relative; font-family: var(--display); font-weight: 900; color: var(--ink); background: var(--lime); border: 4px solid var(--ink);
   border-radius: 40px; box-shadow: 0 8px 0 #000; padding: 18px 28px 12px; text-align: center; animation: rw-pop .6s cubic-bezier(.2,1.8,.4,1); }
 .lv-big small { display: block; font-size: 14px; letter-spacing: 3px; }
 .lv-big b { display: block; font-size: 84px; line-height: 1; letter-spacing: -4px; }
 @keyframes rw-spin { to { transform: rotate(360deg); } }
 @keyframes rw-pop { from { transform: scale(.2) rotate(-8deg); opacity: 0; } }
-@keyframes rw-flip { to { opacity: 1; transform: rotateY(0) scale(1); } }
-@keyframes rw-drop { to { opacity: 1; transform: none; } }
+@keyframes rw-flipin { from { opacity: 0; transform: rotateY(90deg) scale(.6); } }
+@keyframes rw-dropin { from { opacity: 0; transform: translateY(-30px); } }
 @keyframes rw-glow { 50% { box-shadow: 0 5px 0 var(--ink), 0 0 44px 14px rgba(255,176,0,1); } }
 `;
 let cssDone = false;
@@ -134,7 +145,8 @@ export function revealReward(title, reward = {}, onClose) {
       }, 250 + i * 220);
     });
     [...lettersEl.children].forEach((t, i) => setTimeout(() => t.classList.add('in'), 250 + cards.length * 220 + i * 60));
-    btn.style.animationDelay = (0.3 + cards.length * 0.22 + letters.length * 0.06) + 's';
+    // кнопку показываем таймером, а не CSS-анимацией: та может «застрять» в свёрнутой вкладке
+    setTimeout(() => btn.classList.add('show'), Math.min(1600, 300 + cards.length * 220 + letters.length * 60));
 
     let closed = false;
     const close = () => {
@@ -152,6 +164,37 @@ export function revealReward(title, reward = {}, onClose) {
       setTimeout(() => { back.remove(); onClose && onClose(); done(); }, 260);
     };
     btn.addEventListener('click', close);
+    // тап по фону тоже закрывает — после того, как всё показалось
+    setTimeout(() => back.addEventListener('click', (e) => { if (e.target === back) close(); }), 1700);
+  });
+}
+
+/** Сундук: тапни несколько раз — он трясётся и лопается, внутри — награда */
+export function openChest(title, tier, reward, onClose) {
+  enqueue((done) => {
+    ensureCss();
+    const icon = { wood: '🎁', silver: '💼', gold: '👑' }[tier] || '🎁';
+    const chest = h('button.ch-box.ch-' + tier, icon);
+    const hint = h('div.ch-hint', 'Тапни!');
+    const back = h('div.rw-back' + (tier === 'gold' ? '.gold' : ''), h('div.rw-rays'), h('div.rw-title', title), chest, hint);
+    document.body.append(back);
+    sfx('coin');
+    let taps = 0;
+    const need = 3;
+    chest.addEventListener('click', () => {
+      taps++;
+      buzz(15 + taps * 10);
+      sfx(taps < need ? 'tap' : 'win');
+      chest.classList.remove('hit'); void chest.offsetWidth; chest.classList.add('hit');
+      chest.style.setProperty('--s', 1 + taps * 0.15);
+      if (taps >= need) {
+        hint.textContent = '';
+        chest.classList.add('boom');
+        const r = chest.getBoundingClientRect();
+        confetti(r.left + r.width / 2, r.top + r.height / 2, 70);
+        setTimeout(() => { back.remove(); done(); revealReward('Что внутри!', reward, onClose); }, 450);
+      } else hint.textContent = ['Ещё!', 'Почти!'][taps - 1] || 'Ещё!';
+    });
   });
 }
 
@@ -162,7 +205,8 @@ export function celebrateLevel(level, reward, onClose) {
     const back = h('div.rw-back.gold', h('div.rw-rays'),
       h('div.lv-big', h('small', 'УРОВЕНЬ'), h('b', String(level))),
       h('div.rw-title', 'Новый уровень!'));
-    const btn = h('button.btn.btn-big.rw-btn', { style: { animationDelay: '.6s' } }, 'Ура!');
+    const btn = h('button.btn.btn-big.rw-btn', 'Ура!');
+    setTimeout(() => btn.classList.add('show'), 600);
     back.append(btn);
     document.body.append(back);
     sfx('reward'); buzz([20, 60, 20, 60, 40]);
