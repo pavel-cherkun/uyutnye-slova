@@ -14,7 +14,7 @@ import { renderOrders, readyOrders } from './screens/orders.js';
 import { setupDevice } from './ui/device.js';
 import { maybeDailyGift, maybeIosHint } from './screens/settings.js';
 import { syncLetters, levelInfo, gainXP, chestReward, CHEST_EVERY } from './progression.js';
-import { openChest } from './ui/fx.js';
+import { openChest, hold } from './ui/fx.js';
 import { dailyReady } from './screens/daily.js';
 
 const app = document.getElementById('app');
@@ -146,6 +146,7 @@ async function openGame(id) {
   if (g.energy) store.spendEnergy(g.energy);
 
   gameOpen = true;
+  hold(true); // большие окна (новый уровень и т.п.) подождут конца партии
   const layer = h('div#game-layer');
   app.append(layer);
   let cleanup = null;
@@ -165,9 +166,17 @@ async function openGame(id) {
       (state.stats.plays ||= {})[id] = (state.stats.plays[id] || 0) + 1;
       store.applyReward(reward);
       close();
-      showReward(title, reward);
-      // опыт за сыгранную партию: побольше, если были трофеи
-      gainXP(10 + Object.values(reward.items || {}).reduce((a, b) => a + b, 0) * 2, { x: innerWidth / 2, y: innerHeight * 0.3 });
+      // опыт за партию; если пришёл новый уровень — он и подарок за него в ТОМ ЖЕ окне итогов
+      const lv = gainXP(10 + Object.values(reward.items || {}).reduce((a, b) => a + b, 0) * 2, { x: innerWidth / 2, y: innerHeight * 0.3 }, { merge: true });
+      let shown = reward;
+      if (lv) {
+        shown = { ...reward, items: { ...(reward.items || {}) } };
+        shown.energy = (reward.energy || 0) + lv.reward.energy;
+        shown.keys = (reward.keys || 0) + lv.reward.keys;
+        shown.letters = (typeof reward.letters === 'string' ? reward.letters : '') + lv.reward.letters;
+        for (const [k, n] of Object.entries(lv.reward.items)) shown.items[k] = (shown.items[k] || 0) + n;
+      }
+      showReward(title, shown, null, lv ? { level: lv.level } : {});
       // каждые CHEST_EVERY партий — сундук
       state.progress.playCount = (state.progress.playCount || 0) + 1;
       if (state.progress.playCount % CHEST_EVERY === 0) {
@@ -176,8 +185,9 @@ async function openGame(id) {
         openChest(`Сундук за ${CHEST_EVERY} игр!`, 'silver', r, () => refresh());
       }
       store.commit();
+      hold(false);
     },
-    exit: close,
+    exit: () => { close(); hold(false); },
   };
   try {
     cleanup = mod.mount(layer, ctx);

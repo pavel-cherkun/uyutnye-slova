@@ -45,14 +45,24 @@ export function levelInfo(xp = state.xp || 0) {
 }
 
 /** Опыт за маленькие победы. at — точка на экране для всплывающего «+N». */
-export function gainXP(n, at) {
-  if (!n) return;
+export function gainXP(n, at, { merge = false } = {}) {
+  if (!n) return null;
   const before = levelInfo().lvl;
   state.xp = (state.xp || 0) + n;
   commit();
   floatText(`+${n} ⭐`, at?.x ?? innerWidth / 2, at?.y ?? 120);
   const after = levelInfo().lvl;
-  for (let lvl = before + 1; lvl <= after; lvl++) celebrateLevel(lvl, levelReward(lvl));
+  if (after === before) return null;
+  // несколько уровней сразу — один общий подарок и одно окно
+  const total = { items: {}, letters: '', energy: 0, keys: 0 };
+  for (let lvl = before + 1; lvl <= after; lvl++) {
+    const r = levelReward(lvl);
+    total.energy += r.energy || 0; total.keys += r.keys || 0; total.letters += r.letters || '';
+    for (const [id, k] of Object.entries(r.items || {})) total.items[id] = (total.items[id] || 0) + k;
+  }
+  if (merge) return { level: after, reward: total }; // покажет вызывающий — вместе со своим окном
+  celebrateLevel(after, total);
+  return null;
 }
 
 function levelReward(lvl) {
