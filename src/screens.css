@@ -198,3 +198,39 @@
   .hud-pill .ic { font-size: 14px; }
   .hud-avatar { width: 34px; height: 34px; }
 }
+
+/* ---------- Хаб: плитки ---------- */
+.gm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.gm-tile {
+  position: relative; border: 0; border-radius: 26px; color: #fff; padding: 18px 8px 14px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 150px; justify-content: center;
+  box-shadow: 0 6px 0 rgba(0,0,0,.15); transition: transform .1s;
+}
+.gm-tile:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,.15); }
+.gm-tile:first-child { grid-column: span 2; min-height: 120px; flex-direction: row; gap: 14px; }
+.gm-tile:first-child .gm-big { font-size: 56px; }
+.gm-big { font-size: 64px; line-height: 1; filter: drop-shadow(0 4px 4px rgba(0,0,0,.18)); }
+.gm-name { font-weight: 900; font-size: 18px; }
+.gm-flow { font-size: 15px; font-weight: 900; background: rgba(255,255,255,.25); border-radius: 99px; padding: 2px 10px; }
+.gm-cost { position: absolute; top: 10px; right: 12px; font-size: 13px; font-weight: 900; background: rgba(0,0,0,.18); border-radius: 99px; padding: 2px 8px; }
+.gm-tile.locked { filter: saturate(.35); }
+.gm-tile.locked .gm-big { opacity: .7; }
+.tip-flow { text-align: center; font-size: 26px; font-weight: 900; }
+
+/* ---------- Задание: одна строка ---------- */
+.qs-card {
+  width: 100%; border: 0; display: flex; align-items: center; gap: 10px; text-align: left;
+  background: #fff; border-radius: 18px; padding: 10px 12px; margin: 4px 0 14px;
+  box-shadow: inset 0 0 0 3px var(--yellow), var(--shadow); color: var(--ink);
+}
+.qs-card.ok { box-shadow: inset 0 0 0 3px var(--green), var(--shadow); animation: bump .6s 2; }
+.qs-badge { font-size: 26px; }
+.qs-title { flex: 1; font-weight: 900; font-size: 15px; }
+.qs-step { font-size: 11px; font-weight: 800; color: var(--ink-soft); }
+.qs-go { width: 34px; height: 34px; border-radius: 50%; background: var(--pink); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 15px; flex: none; }
+.qs-card.ok .qs-go { background: var(--green); font-size: 18px; }
+.hm-info { font-weight: 900; font-size: 14px; padding: 0 6px; }
+.hm-empty .hm-floor .hm-cell:nth-child(8), .hm-empty .hm-wallrow .hm-cell:nth-child(3) { animation: hm-hint 1.2s infinite; outline-color: #fff; }
+@keyframes hm-hint { 50% { transform: scale(1.08); background: rgba(255,255,255,.55); } }
+.or-req { border: 0; width: 100%; text-align: left; color: var(--ink); font-family: inherit; }
+.or-card .row .btn-ghost { flex: 0 0 auto; }

@@ -185,3 +185,11 @@ input { font-family: inherit; }
   padding: calc(8px + var(--safe-top)) 10px 8px;
 }
 .game-title { font-weight: 900; font-size: 18px; flex: 1; }
+
+/* Буква-плитка вместо эмодзи 🔤 (оно латинское: abc) */
+.ltr {
+  display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;
+  width: 1.25em; height: 1.35em; border-radius: .3em; font-weight: 900; font-size: .9em; line-height: 1;
+  background: linear-gradient(180deg, #fff7d6, #ffe08a); color: #6b4300; box-shadow: 0 .12em 0 #d9a92e;
+}
+.ltr-big { font-size: 1em; width: 1.15em; height: 1.2em; }

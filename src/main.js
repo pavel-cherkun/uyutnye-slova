@@ -8,7 +8,7 @@ import { renderCreate, renderProfile } from './screens/character.js';
 import { renderHome } from './screens/home.js';
 import { renderBag } from './screens/bag.js';
 import { renderOven } from './screens/oven.js';
-import { renderGames, GAMES } from './screens/games.js';
+import { renderGames, GAMES, gameIcon, flowNodes } from './screens/games.js';
 import { loadDict } from './data/dict.js';
 import { renderOrders, readyOrders } from './screens/orders.js';
 import { setupDevice } from './ui/device.js';
@@ -53,7 +53,7 @@ function renderHud() {
   if (!hudEl) return;
   const vals = { energy: state.energy, coins: state.coins, keys: state.keys, letters: totalLetters() };
   const pill = (k, ic, title) => {
-    const el = h('div.hud-pill', { title }, h('span.ic', ic), vals[k]);
+    const el = h('div.hud-pill', { title }, ic === 'L' ? h('span.ltr', 'А') : h('span.ic', ic), vals[k]);
     if (prevHud[k] != null && prevHud[k] !== vals[k]) el.classList.add('bump');
     return el;
   };
@@ -62,7 +62,7 @@ function renderHud() {
     pill('energy', '⚡', 'Энергия'),
     pill('coins', '🪙', 'Монеты'),
     pill('keys', '🗝️', 'Ключи'),
-    pill('letters', '🔤', 'Буквы'),
+    pill('letters', 'L', 'Буквы'),
     h('div.hud-spacer'),
     h('button.btn-icon.hud-gear', { onclick: () => go('me'), 'aria-label': 'Настройки' }, '⚙️'),
   );
@@ -122,11 +122,11 @@ async function openGame(id) {
     const go = await new Promise((resolve) => {
       let started = false;
       const m = modal([
-        h('div.hm-big', g.emoji),
+        h('div.hm-big', gameIcon(g.emoji)),
         h('div.modal-title', g.title),
-        h('div.tip-list', g.tip.map((t) => h('div.tip-row', t))),
-        h('div.small.center.muted', `берёт: ${g.takes} · даёт: ${g.gives}`),
-        h('button.btn.btn-big', { onclick: () => { started = true; m.close(); resolve(true); } }, 'Играть!'),
+        h('div.tip-flow', flowNodes(g.flow)),
+        h('div.center', g.tip),
+        h('button.btn.btn-big', { onclick: () => { started = true; m.close(); resolve(true); } }, 'Играть'),
       ], { onClose: () => { if (!started) resolve(false); } });
     });
     seen.push(id); store.commit();
@@ -173,5 +173,5 @@ window.game = { store, openGame };
 
 setupDevice();
 syncLetters();
-app.replaceChildren(h('div.splash', h('div.splash-logo', '🔤'), h('div.splash-text', 'Раскладываем буквы…')));
+app.replaceChildren(h('div.splash', h('div.splash-logo', h('span.ltr.ltr-big', 'А')), h('div.splash-text', 'Раскладываем буквы…')));
 loadDict().then(boot);
