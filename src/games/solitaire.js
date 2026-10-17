@@ -391,7 +391,7 @@ export function buildReward(g, won, rng = Math.random, owned = {}) {
     add(pickR(fresh.length ? fresh : pool).id);
     if (won && mine.length >= 4 && rng() < 0.3) add(pickR(its).id);
   }
-  const reward = { coins: won ? 10 + movesLeft(g) : 3 };
+  const reward = {};
   if (won) reward.keys = 1;
   if (Object.keys(items).length) reward.items = items;
   return { reward, spent };

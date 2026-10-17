@@ -31,7 +31,7 @@ const TIME = 90;          // секунд на сцену
 const PENALTY = 5;        // штраф за промах
 const TARGETS = 7;
 const SCENE_MIN = 45, SCENE_MAX = 60;
-const HINT_COST = 15;
+const HINT_COST = 3; // энергии, если нет лупы
 const HIT_PAD = 8;        // запас хитбокса, px
 
 const BLOB_COLORS = ['#ffffff', '#ffc93c', '#ff4f8b', '#3fa9ff', '#2fcf98', '#a66bff', '#ff8a3d'];
@@ -223,7 +223,7 @@ export function mount(root, ctx) {
 
     const updateHint = () => {
       const n = store.itemCount('ЛУПА');
-      hintN.textContent = n > 0 ? '×' + n : HINT_COST + '🪙';
+      hintN.textContent = n > 0 ? '×' + n : HINT_COST + '⚡';
     };
     updateHint();
 
@@ -386,8 +386,8 @@ export function mount(root, ctx) {
       if (ring && !found.has(ring.dataset.id)) { toast('Подсказка уже горит!'); return; }
       if (store.itemCount('ЛУПА') > 0) {
         store.removeItem('ЛУПА');
-      } else if (!store.spendCoins(HINT_COST)) {
-        toast('Нужна лупа или ' + HINT_COST + ' 🪙. Лупу можно составить в «Эрудите»: ЛУПА', 3200);
+      } else if (!store.spendEnergy(HINT_COST)) {
+        toast('Нужна лупа 🔍 — собери слово ЛУПА в Эрудите', 3200);
         return;
       }
       updateHint();
@@ -426,7 +426,7 @@ export function mount(root, ctx) {
       clearInterval(tick); tick = null;
       const reward = { items: foundReward() };
       if (victory) {
-        reward.coins = 10 + Math.round(Math.max(0, timeLeft) / 3);
+        reward.energy = 2 + Math.round(Math.max(0, timeLeft) / 30);
         if (Math.random() < 0.25) reward.items['ЛУПА'] = (reward.items['ЛУПА'] || 0) + 1;
       }
       if (!Object.keys(reward.items).length) delete reward.items;

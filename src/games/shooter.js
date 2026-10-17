@@ -124,7 +124,6 @@ export function mount(root, ctx) {
   const collected = [];   // буквы сессии
   let arrived = 0;        // сколько букв «долетело» до счётчика
   let energy = 0;
-  let coins = 0;
   const best0 = (ctx.store.state.stats && ctx.store.state.stats.shooterBest) || 0;
 
   // --- DOM ---
@@ -317,7 +316,10 @@ export function mount(root, ctx) {
     const x = bo.c + 0.5, y = bo.r + 0.5;
     if (bo.kind === 'plus') { S.plusPending++; floatText('+1 ⚪', x, y); }
     else if (bo.kind === 'energy') { energy++; floatText('+1 ⚡', x, y); }
-    else if (bo.kind === 'coin') { const n = rint(1, 3); coins += n; floatText('+' + n + ' 🪙', x, y); }
+    else if (bo.kind === 'coin') { // 🎁 — пара бонусных букв
+      for (let i = 0; i < 2; i++) { const ch = randomLetter(); collected.push(ch); flyLetter(ch, x, y); }
+      floatText('+2 буквы', x, y);
+    }
     else if (bo.kind === 'boom') { floatText('БУМ!', x, y); explode(bo.c, bo.r); }
     for (let i = 0; i < 8; i++) {
       const a = Math.random() * Math.PI * 2;
@@ -681,7 +683,7 @@ export function mount(root, ctx) {
         g.fillText('+1', cx, cy + 1);
       } else {
         g.font = `${Math.round(s * 0.3)}px system-ui, sans-serif`;
-        g.fillText({ energy: '⚡', coin: '🪙', boom: '💥' }[bo.kind], cx, cy + 1);
+        g.fillText({ energy: '⚡', coin: '🎁', boom: '💥' }[bo.kind], cx, cy + 1);
       }
     }
 
@@ -818,7 +820,6 @@ export function mount(root, ctx) {
     const r = {};
     if (collected.length) r.letters = collected.join('');
     if (energy) r.energy = energy;
-    if (coins) r.coins = coins;
     return r;
   }
 
@@ -875,7 +876,6 @@ export function mount(root, ctx) {
         h('div.sh-pill', 'Ход ' + S.turn),
         h('div.sh-pill', '🏆 ' + Math.max(best0, S.turn)),
         energy ? h('div.sh-pill', '⚡ +' + energy) : null,
-        coins ? h('div.sh-pill', '🪙 +' + coins) : null,
       ),
       isRecord && best0 > 0 ? h('div.sh-record', 'Новый рекорд!') : null,
       collected.length

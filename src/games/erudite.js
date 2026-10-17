@@ -1,10 +1,10 @@
 // Эрудит: составляешь слова из букв в сумке. Слово превращается в предмет, карточку, эссенцию
-// или открывает комнату. Буквы тратятся, за слово дают монеты по очкам букв.
+// или открывает комнату. Буквы тратятся.
 
 import { h, toast, confetti, pick, modal } from '../ui/common.js';
 import { classifyWord, getItem, ITEMS, ROOMS, CATEGORIES, RARITY } from '../data/items.js';
 import { CARD_WORDS, ESSENCE_WORDS } from '../data/words.js';
-import { ALPHABET, LETTER_SCORE, wordScore } from '../data/letters.js';
+import { ALPHABET } from '../data/letters.js';
 import { dictWords, dictCat } from '../data/dict.js';
 import { isLetterOpen } from '../data/letters.js';
 import { nextStage, checkLetterUnlock, wordsCount } from '../progression.js';
@@ -17,7 +17,7 @@ export const meta = {
   desc: 'Составляй слова из своих букв', cost: { energy: 0 }, gives: 'предметы, комнаты',
 };
 
-const HINT_COST = 8;
+const HINT_COST = 2; // энергии
 let ALL_WORDS = null;
 function allWords() {
   if (!ALL_WORDS) ALL_WORDS = [...new Set([
@@ -84,7 +84,7 @@ export function mount(root, ctx) {
     h('div.game-top',
       h('button.btn-icon', { onclick: () => ctx.exit() }, '✕'),
       h('div.game-title', '✍️ Эрудит'),
-      h('button.btn.btn-yellow.btn-sm', { onclick: hint, style: { boxShadow: '0 3px 0 #d79a00' } }, `💡 ${HINT_COST}🪙`),
+      h('button.btn.btn-yellow.btn-sm', { onclick: hint, style: { boxShadow: '0 3px 0 #d79a00' } }, `💡 ${HINT_COST}⚡`),
     ),
     h('div.er-wrap',
       nextEl,
@@ -113,15 +113,14 @@ export function mount(root, ctx) {
     previewEl.replaceChildren();
     submitBtn.disabled = !c || c.kind === 'invalid';
     if (c) {
-      const score = wordScore(w);
       if (c.kind === 'invalid') previewEl.append(h('span.bad', w.length < 3 ? '…' : 'нет такого слова'));
       else if (c.kind === 'room') previewEl.append(state.rooms[c.room.id]
-        ? h('span', `🏠 · +${score}🪙`)
+        ? h('span', '🏠 уже открыта')
         : h('span.room', `🔓 ${c.room.name}!`));
       else {
         const it = getItem(c.id);
         const label = TOOL_USE[c.id] ? '🔨 инструмент' : c.kind === 'item' ? '🎁' : c.kind === 'card' ? CATEGORIES[it.cat].name.toLowerCase() : '✨ в печь';
-        previewEl.append(h('span', `${it.emoji} ${label} · +${score}🪙`));
+        previewEl.append(h('span', `${it.emoji} ${label}`));
       }
     }
 
@@ -133,7 +132,7 @@ export function mount(root, ctx) {
         }, h('span.tile', ch));
       }
       return h('button.er-key', { disabled: n <= 0, onclick: () => { word.push(ch); navigator.vibrate?.(5); render(); } },
-        h('span.tile', ch), h('span.n', n), h('span.s', LETTER_SCORE[ch]));
+        h('span.tile', ch), h('span.n', n));
     }));
 
     const ns = nextStage();
@@ -149,13 +148,11 @@ export function mount(root, ctx) {
 
     const first = !state.progress.wordsMade[w];
     state.progress.wordsMade[w] = (state.progress.wordsMade[w] || 0) + 1;
-    let coins = wordScore(w) * (first ? 2 : 1);
     let emoji;
 
     if (c.kind === 'room') {
       if (!state.rooms[c.room.id]) {
         state.rooms[c.room.id] = { cells: {} };
-        coins += 30;
         emoji = '🔑';
         toast(`Открыта комната «${c.room.name}»!`, 2600);
         confetti(innerWidth / 2, innerHeight / 3, 60);
@@ -165,8 +162,7 @@ export function mount(root, ctx) {
       emoji = getItem(c.id).emoji;
       if (c.kind === 'item') confetti(innerWidth / 2, innerHeight / 3, 30);
     }
-    store.addCoins(coins);
-    toast(`+${coins} 🪙`);
+    if (first) toast('✨ Новое слово');
     made.unshift({ word: w, emoji });
     const burst = h('div.er-burst', emoji);
     root.append(burst); setTimeout(() => burst.remove(), 1000);
@@ -197,7 +193,7 @@ export function mount(root, ctx) {
     };
     const can = allWords().filter((w) => w.length >= 3 && fits(w));
     if (!can.length) { toast('Букв маловато — сыграй в Блоки 🎯', 2400); return; }
-    if (!store.spendCoins(HINT_COST)) { toast('Не хватает монет'); return; }
+    if (!store.spendEnergy(HINT_COST)) { toast('Нужно ' + HINT_COST + ' ⚡'); return; }
     // сначала комнаты, потом предметы, карточки, эссенции, «разное»; среди них — новые слова
     const scored = can.map((w) => {
       const c = classifyWord(w);

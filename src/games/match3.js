@@ -11,7 +11,7 @@ export const meta = {
   emoji: '🍬',
   desc: 'Собирай ряды из предметов',
   cost: { energy: 5 },
-  gives: 'ключи, монеты, предметы',
+  gives: 'ключи, предметы',
 };
 
 export const SIZE = 8;
@@ -932,7 +932,6 @@ function playLevel(root, ctx, chosen) {
     store.commit();
     const reward = {
       keys: 1,
-      coins: 15 + movesLeft * 3,
       items: Object.fromEntries(goals.map((g) => [items[g.type].id, 2])),
     };
     vibrate([20, 40, 20]);
@@ -960,7 +959,7 @@ function playLevel(root, ctx, chosen) {
     ended = true;
     busy = true;
     updateMoves();
-    const finishLose = () => ctx.finish({ coins: 5 }, 'Ходы закончились');
+    const finishLose = () => ctx.finish({}, 'Ходы закончились');
     if (extraUsed) {
       banner('Ходы закончились 😿', true, 1200);
       return wait(1100).then(() => { if (alive) finishLose(); });

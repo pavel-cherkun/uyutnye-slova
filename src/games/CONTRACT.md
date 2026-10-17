@@ -21,9 +21,9 @@ export function mount(root, ctx) { ... return () => {}; }
 ```
 
 `ctx`:
-- `ctx.store` — весь модуль `src/state.js` (state, addItem, removeItem, itemCount, addLetters, spendLetters, canSpell, letterCount, spendEnergy, addCoins, spendKeys…).
+- `ctx.store` — весь модуль `src/state.js` (state, addItem, removeItem, itemCount, addLetters, spendLetters, canSpell, letterCount, spendEnergy, addEnergy, spendKeys…).
 - `ctx.finish(reward, title?)` — закончить игру: награда применяется, показывается окно наград, игрок возвращается в хаб.
-  `reward = { items?: {id: n}, letters?: 'АБВ' | {А: 2}, energy?, coins?, keys? }`.
+  `reward = { items?: {id: n}, letters?: 'АБВ' | {А: 2}, energy?, keys? }`.
 - `ctx.exit()` — выйти без награды (подтверждение выхода, если нужно, игра показывает сама).
 
 Данные:
