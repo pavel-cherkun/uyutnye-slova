@@ -323,8 +323,6 @@ export const ROOMS = [
  */
 export function classifyWord(raw) {
   const word = normWord(raw);
-  const room = ROOMS.find((r) => r.word === word);
-  if (room) return { kind: 'room', room, word };
   if (BY_ID[word]) return { kind: 'item', id: word, word };
   if (CARD_WORDS[word]) return { kind: 'card', id: 'card:' + word, word };
   if (ESSENCE_WORDS.has(word)) return { kind: 'essence', id: 'ess:' + word, word };
