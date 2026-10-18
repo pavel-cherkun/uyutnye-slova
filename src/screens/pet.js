@@ -169,6 +169,7 @@ function homeView(p, rerender, nav) {
     h('div.pt-acts',
       roundBtn('🍖', 'Покормить', () => feedModal(p, rerender, nav)),
       roundBtn('🎀', 'Нарядить', () => outfitModal(p, rerender, nav)),
+      roundBtn('🎁', 'Подарить', () => giftModal(p, rerender)),
     ),
     h('div.pt-sec', 'Прогулка'),
     h('div.pt-walks', WALKS.map((w) => {
@@ -232,6 +233,44 @@ function feedModal(p, rerender) {
   const head = h('div.pt-m-sub', `Сытость ${p.food}%`);
   fill();
   m = modal([h('div.modal-title', 'Покормить'), head, list,
+    h('button.btn.btn-ghost', { onclick: () => m.close() }, 'Готово')], { onClose: rerender });
+}
+
+// ---------- Подарить ----------
+// Любая вещь (кроме еды) может стать подарком: так у мебели, декора, техники и прочего есть смысл.
+// У каждого зверя любимые категории — подарок из них радует вдвое сильнее.
+export const FAVS = {
+  cat: ['decor', 'dishes', 'furniture'], dog: ['sport', 'tools', 'furniture'], hamster: ['plants', 'stationery', 'decor'],
+  rabbit: ['plants', 'bath', 'light'], parrot: ['music', 'tech', 'walldecor'], fox: ['fantasy', 'nature', 'transport'],
+};
+const GIFT_JOY = { c: 4, r: 8, e: 16, l: 30 };
+function giftModal(p, rerender) {
+  let m;
+  const favs = FAVS[p.kind] || [];
+  const list = h('div.pt-list');
+  const head = h('div.pt-m-sub', `Радость ${p.joy}% · любит: ${favs.map((c) => CATEGORIES[c].icon + ' ' + CATEGORIES[c].name.toLowerCase()).join(', ')}`);
+  const fill = () => {
+    const ids = Object.keys(state.items).filter((id) => { const it = getItem(id); return it.tier === 1 && eatValue(id) == null; })
+      .sort((a, b) => (favs.includes(getItem(b).cat) - favs.includes(getItem(a).cat)) || getItem(a).word.localeCompare(getItem(b).word));
+    list.replaceChildren(...(ids.length ? ids.map((id) => {
+      const it = getItem(id);
+      const fav = favs.includes(it.cat);
+      const v = GIFT_JOY[it.rarity] * (fav ? 2 : 1);
+      return h('button.pt-li', {
+        onclick: (e) => {
+          if (!removeItem(id)) return;
+          p.joy = clamp(p.joy + v);
+          addPetXP(p, v);
+          commit();
+          floatText(fav ? '😍 +' + v : '❤️ +' + v, e.clientX, e.clientY - 20);
+          head.firstChild.textContent = `Радость ${p.joy}% · любит: ${favs.map((c) => CATEGORIES[c].icon + ' ' + CATEGORIES[c].name.toLowerCase()).join(', ')}`;
+          fill();
+        },
+      }, h('span.pt-li-e', it.emoji), h('span.pt-li-w', (fav ? '⭐ ' : '') + it.word.toLowerCase()), h('span.pt-li-n', `×${state.items[id]}`), h('span.pt-li-v', `+${v}`));
+    }) : [h('div.pt-empty', 'Пока нечего подарить — вещи дают игры и прогулки')]));
+  };
+  fill();
+  m = modal([h('div.modal-title', 'Подарить'), head, list,
     h('button.btn.btn-ghost', { onclick: () => m.close() }, 'Готово')], { onClose: rerender });
 }
 
@@ -342,7 +381,7 @@ function claim(p, frac, rerender) {
     const nl = Math.max(1, Math.round(def.letters * frac));
     for (let i = 0; i < nl; i++) letters += randomLetter();
     reward.letters = letters;
-    const en = Math.round((4 + def.letters) * frac);
+    const en = Math.round(({ s: 3, m: 6, l: 12 }[def.id] || 3) * frac); // энергии скромно: прогулка — за буквы и находки
     if (en) reward.energy = en;
     if (Math.random() < ({ s: 0.15, m: 0.35, l: 0.7 }[def.id]) * frac + p.level * 0.02) reward.keys = 1;
     // предметы — из сундука по длине прогулки; досрочно — меньше
@@ -396,7 +435,8 @@ const CSS = `
 .pt-ava { flex: none; width: 46px; height: 46px; border-radius: 50%; background: var(--pt-y, #eef24a); display: grid; place-items: center; font-size: 26px; }
 @keyframes pt-drop { from { transform: translateY(-20px); opacity: 0; } }
 
-.pt-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pt-acts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.pt-acts .pt-round { flex-direction: column; gap: 6px; border-radius: 26px; padding: 10px 6px 12px; font-size: 13px; }
 .pt-round { display: flex; align-items: center; gap: 10px; border: 0; border-radius: 999px; background: var(--ink); color: #fff; padding: 7px 16px 7px 7px;
   font-weight: 900; font-size: 16px; cursor: pointer; }
 .pt-round:active, .pt-swipe:active { transform: scale(.97); }

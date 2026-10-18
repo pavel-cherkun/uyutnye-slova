@@ -4,6 +4,7 @@ import { h, toast, confetti, showReward, pick } from '../ui/common.js';
 import { state, commit, removeItem, addEnergy, spendKeys, applyReward, MAX_ENERGY } from '../state.js';
 import { getItem, burnValue, RARITY, ITEMS, itemsByCat } from '../data/items.js';
 import { gainXP } from '../progression.js';
+import { ALPHABET, isLetterOpen } from '../data/letters.js';
 
 export const OVEN_MAX = 5;
 export function ovenMult() { return 1 + 0.25 * (state.oven.level - 1); }
@@ -70,6 +71,8 @@ export function renderOven(root) {
         : h('div.small.muted', 'Пока нет троек'),
     ),
 
+    lettersSwap(rerender),
+
     h('div.card.row',
       h('div', h('b', '⬆️ Печь'), h('div.small.muted', state.oven.level >= OVEN_MAX ? 'максимум' : `⚡ ×${1 + 0.25 * state.oven.level}`)),
       state.oven.level < OVEN_MAX ? h('button.btn.btn-yellow', {
@@ -98,4 +101,37 @@ function bake(it, rerender) {
   applyReward({ items: { [got.id]: 1 } });
   confetti();
   showReward('Испеклось!', { items: { [got.id]: 1 } }, rerender);
+}
+
+// Обмен букв: 3 самые многочисленные (лишние) буквы → 1 нужная открытая.
+// Решает проблему «копятся буквы, из которых ничего не собрать».
+function takeFor(target) {
+  const pool = Object.entries(state.letters).filter(([ch, n]) => ch !== target && n > 0).sort((a, b) => b[1] - a[1]);
+  const take = [];
+  const left = Object.fromEntries(pool);
+  for (let i = 0; i < 3; i++) {
+    const best = Object.entries(left).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1])[0];
+    if (!best) return null;
+    take.push(best[0]); left[best[0]]--;
+  }
+  return take;
+}
+function lettersSwap(rerender) {
+  const total = Object.values(state.letters).reduce((a, b) => a + b, 0);
+  return h('div.card.stack',
+    h('b', '🔁 Обмен букв: 3 лишних → 1 нужная'),
+    total < 3 ? h('div.small.muted', 'Нужно хотя бы 3 буквы') : h('div.ov-swap', ALPHABET.filter((ch) => isLetterOpen(ch)).map((ch) =>
+      h('button.tile', {
+        onclick: () => {
+          const take = takeFor(ch);
+          if (!take) { toast('Не хватает букв для обмена'); return; }
+          for (const t of take) { state.letters[t]--; if (state.letters[t] <= 0) delete state.letters[t]; }
+          state.letters[ch] = (state.letters[ch] || 0) + 1;
+          commit();
+          toast(`${take.join(' ')} → ${ch}`);
+          rerender();
+        },
+      }, ch))),
+    total >= 3 ? h('div.small.muted', 'Тап по букве — заберём 3 самые многочисленные') : null,
+  );
 }
