@@ -83,12 +83,12 @@ export const WORD_XP = { c: 4, r: 8, e: 15, l: 30 };
 
 // ---------- Сундуки ----------
 // tier: 'wood' | 'silver' | 'gold' — чем выше, тем больше и тем выше шанс на эпик/легенду
-export function chestReward(tier = 'wood') {
+export function chestReward(tier = 'wood', { noKeys = false } = {}) {
   const k = { wood: 1, silver: 2, gold: 3 }[tier];
   let letters = '';
   for (let i = 0; i < 3 + k * 3; i++) letters += rl();
   const reward = { energy: 6 + k * 6, letters, items: {} };
-  if (k >= 2 || Math.random() < 0.35) reward.keys = k >= 3 ? 2 : 1;
+  if (!noKeys && (k >= 2 || Math.random() < 0.35)) reward.keys = k >= 3 ? 2 : 1;
   const rolls = k + 1;
   for (let i = 0; i < rolls; i++) {
     const r = Math.random();

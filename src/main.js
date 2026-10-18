@@ -8,7 +8,7 @@ import { renderCreate, renderProfile } from './screens/character.js';
 import { renderPet, petBadge } from './screens/pet.js';
 import { renderBag } from './screens/bag.js';
 import { renderOven } from './screens/oven.js';
-import { renderGames, GAMES, gameIcon, flowNodes } from './screens/games.js';
+import { renderGames, GAMES, gameIcon, flowNodes, lockedReason } from './screens/games.js';
 import { loadDict } from './data/dict.js';
 import { renderOrders, readyOrders } from './screens/orders.js';
 import { setupDevice } from './ui/device.js';
@@ -133,6 +133,7 @@ subscribe(() => {
 async function openGame(id) {
   const g = GAMES.find((x) => x.id === id);
   if (!g || gameOpen) return;
+  if (levelInfo().lvl < (g.lvl || 1)) { toast(lockedReason(g), 2800); return; }
   if (g.energy && state.energy < g.energy) {
     const m = modal([
       h('div.modal-title', 'Не хватает энергии ⚡'),

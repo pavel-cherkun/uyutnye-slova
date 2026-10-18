@@ -248,3 +248,7 @@ body { background: #1b1b1f; }
 .ov-fire, .splash-logo { animation: none; }
 /* Мгновенный отклик на касание */
 button { touch-action: manipulation; }
+.gm-stash { border: 2px solid var(--lime); background: transparent; color: var(--lime); border-radius: 99px; padding: 3px 9px; font-family: var(--display); font-size: 11px; font-weight: 800; flex: none; opacity: .55; }
+.gm-stash.ready { background: var(--lime); color: var(--ink); opacity: 1; }
+.ov-swap { display: flex; flex-wrap: wrap; gap: 6px; }
+.ov-swap .tile { border: 0; cursor: pointer; }
