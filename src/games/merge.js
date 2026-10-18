@@ -405,9 +405,17 @@ export function mount(root, ctx) {
     const free = randomFreeCell(cells);
     if (free < 0) { toast('Поле заполнено — забери что-нибудь в сумку'); sfx('error'); retrigger(btn, 'shake'); return; }
     const gs = genState();
-    const g = genCharges(gs[cat]);
+    let g = genCharges(gs[cat]);
+    // пустой генератор можно зарядить эссенцией (абстрактные слова из Эрудита)
     if (g.charges <= 0) {
-      toast(`Генератор отдыхает — заряд через ${Math.ceil((g.at + GEN_RECHARGE - Date.now()) / 60000)} мин`); sfx('error'); retrigger(btn, 'shake'); return;
+      const ess = Object.keys(S.items).find((id) => id.startsWith('ess:') && S.items[id] > 0);
+      if (ess && store.removeItem(ess)) {
+        g = { charges: 1, at: g.at };
+        toast(`✨ «${ess.slice(4).toLowerCase()}» зарядила генератор`);
+      }
+    }
+    if (g.charges <= 0) {
+      toast(`Генератор отдыхает — заряд через ${Math.ceil((g.at + GEN_RECHARGE - Date.now()) / 60000)} мин. Зарядить можно эссенцией ✨ — собери абстрактное слово в Эрудите`, 3200); sfx('error'); retrigger(btn, 'shake'); return;
     }
     if (!store.spendEnergy(GEN_COST)) {
       toast('Нужна ⚡ — сожги лишнее в печи'); sfx('error'); buzz([20, 40, 20]); retrigger(btn, 'shake'); return;

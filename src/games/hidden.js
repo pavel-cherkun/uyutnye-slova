@@ -182,6 +182,7 @@ export function mount(root, ctx) {
   const retrigger = (el, cls) => { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
 
   // ---------- Экран выбора места ----------
+  const KEY_PRICE = 3; // ключей за открытие места, если слово пока не собрать
   function showSelect() {
     const open = new Set(openPlaces(state).map((p) => p.word));
     const top = h('div.game-top.ho-top',
@@ -197,13 +198,18 @@ export function mount(root, ctx) {
         h('div.ho-loc-ic', place.icon),
         h('div.ho-loc-name', (isOpen ? '' : '🔒 ') + cap(place.word)),
         isOpen ? h('div.ho-loc-go', 'Играть ▶')
-          : h('div.ho-loc-lock', 'собери слово ', h('b', place.word), ' в Эрудите'),
+          : h('div.ho-loc-lock', 'слово ', h('b', place.word), ' или ' + KEY_PRICE + ' 🗝️'),
       );
       card.addEventListener('click', () => {
         if (isOpen) { sfx('tap'); buzz(8); startGame(place); return; }
-        retrigger(card, 'shake');
-        sfx('error'); buzz(15);
-        toast('🔒 ' + lockText, 2600);
+        // закрыто: собрать слово в Эрудите или открыть ключами
+        confirmDialog(`${place.icon} ${cap(place.word)}: собери слово ${place.word} в Эрудите — или открой за ${KEY_PRICE} 🗝️ (у тебя ${state.keys})`, `Открыть за ${KEY_PRICE} 🗝️`).then((yes) => {
+          if (!yes) return;
+          if (!store.spendKeys(KEY_PRICE)) { retrigger(card, 'shake'); sfx('error'); buzz(15); toast('Не хватает ключей — их дают Три в ряд, Пасьянс и заказы', 2800); return; }
+          unlockPlace(state, place.word); store.commit();
+          sfx('reward'); confetti(innerWidth / 2, innerHeight / 3, 40);
+          showSelect();
+        });
       });
       return card;
     });

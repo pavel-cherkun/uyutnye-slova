@@ -15,6 +15,14 @@ import { sfx, buzz } from '../ui/device.js';
 // Что делают инструменты — подсказка прямо в превью слова
 const TOOL_USE = { МОЛОТОК: 'бустер для «Три в ряд»', ЛУПА: 'подсказка в «Поиске»' };
 
+// Каждое слово даёт награду раз в день: иначе бесплатные буквы из «Блоков» + одно и то же короткое
+// слово + печь = бесконечная энергия. Повтор в тот же день не принимается (буквы не тратятся).
+function todayWords(state) {
+  const d = new Date().toLocaleDateString('sv');
+  if (state.progress.today?.date !== d) state.progress.today = { date: d, words: [] };
+  return state.progress.today.words;
+}
+
 export const meta = {
   id: 'erudite', title: 'Эрудит', emoji: '✍️',
   desc: 'Составляй слова из своих букв', cost: { energy: 0 }, gives: 'предметы, комнаты',
@@ -249,6 +257,7 @@ export function mount(root, ctx) {
     let rar = null;
     if (c) {
       if (c.kind === 'invalid') previewEl.append(h('span.bad', w.length < 3 ? '…' : 'нет такого слова'));
+      else if (todayWords(state).includes(w)) previewEl.append(h('span.bad', 'сегодня уже было'));
       else if (c.kind === 'room') {
         rar = 'l';
         previewEl.append(state.rooms[c.room.id] ? h('span', '🏠 уже открыта') : h('span.room', `🔓 ${c.room.name}!`));
@@ -348,24 +357,22 @@ export function mount(root, ctx) {
       sfx('error'); buzz([30, 40, 30]);
       return;
     }
+    if (todayWords(state).includes(w)) {
+      toast(`«${w}» сегодня уже было — собери другое слово`, 2600);
+      wordEl.classList.remove('shake'); void wordEl.offsetWidth; wordEl.classList.add('shake');
+      sfx('error');
+      return;
+    }
     if (!store.spendLetters(w)) { toast('Не хватает букв'); sfx('error'); return; }
+    todayWords(state).push(w);
 
     const first = !state.progress.wordsMade[w];
     state.progress.wordsMade[w] = (state.progress.wordsMade[w] || 0) + 1;
     let emoji;
 
-    if (c.kind === 'room') {
-      if (!state.rooms[c.room.id]) {
-        state.rooms[c.room.id] = { cells: {} };
-        emoji = '🔑';
-        toast(`Открыта комната «${c.room.name}»!`, 2600);
-        confetti(innerWidth / 2, innerHeight / 3, 60);
-      } else emoji = '🏠';
-    } else {
-      store.addItem(c.id);
-      emoji = getItem(c.id).emoji;
-      if (c.kind === 'item') confetti(innerWidth / 2, innerHeight / 3, 30);
-    }
+    store.addItem(c.id);
+    emoji = getItem(c.id).emoji;
+    if (c.kind === 'item') confetti(innerWidth / 2, innerHeight / 3, 30);
     const rar = c.kind === 'room' ? 'l' : getItem(c.id).rarity;
     made.unshift({ word: w, emoji, rar });
     boardEl.querySelectorAll('.er-mini, .er-mini-t').forEach((e) => e.remove());
@@ -422,10 +429,12 @@ export function mount(root, ctx) {
       const c = classifyWord(w);
       let rank = { room: 0, item: 1, card: 2, essence: 3 }[c.kind];
       if (c.kind === 'card' && !CARD_WORDS[w] && dictCat(w) === 'misc') rank = 4;
-      const fresh = !state.progress.wordsMade[w] && !(c.kind === 'room' && state.rooms[c.room.id]);
+      if (todayWords(state).includes(w)) return { w, rank: 99 };
+      const fresh = !state.progress.wordsMade[w];
       return { w, rank: rank + (fresh ? 0 : 10) };
     });
     const top = Math.min(...scored.map((x) => x.rank));
+    if (top >= 99) { store.addEnergy(HINT_COST); toast('Новых слов из этих букв сегодня нет — добудь буквы в Блоках', 2800); return; }
     const w = pick(scored.filter((x) => x.rank === top)).w;
     word = [...w];
     topRank = -1; lastLen = 0;
