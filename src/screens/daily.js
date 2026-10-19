@@ -18,7 +18,7 @@ const METRICS = {
   match3: () => plays('match3'),
   solitaire: () => plays('solitaire'),
   burned: () => state.oven.burned || 0,
-  orders: () => state.progress.ordersDone || 0,
+  wishes: () => state.pet?.wishesDone || 0,
   xp: () => state.xp || 0,
   walks: () => state.pet?.walks || 0,
 };
@@ -31,9 +31,9 @@ const POOL = [
   { m: 'match3', n: 1, icon: '🍬', text: 'Сыграй в Три в ряд' },
   { m: 'solitaire', n: 1, icon: '🃏', text: 'Сыграй в Пасьянс' },
   { m: 'burned', n: 3, icon: '🔥', text: 'Сожги 3 вещи' },
-  { m: 'orders', n: 1, icon: '📋', text: 'Выполни заказ' },
+  { m: 'wishes', n: 1, icon: '💭', text: 'Исполни желание питомца' },
   { m: 'xp', n: 80, icon: '⭐', text: 'Набери 80 ⭐' },
-  { m: 'walks', n: 1, icon: '🦮', text: 'Своди питомца гулять' },
+  { m: 'walks', n: 1, icon: '🗺️', text: 'Отправь питомца в путешествие' },
 ];
 
 const today = () => new Date().toLocaleDateString('sv');

@@ -6,7 +6,8 @@ import { state, commit, applyReward, exportSave, importSave, resetSave } from '.
 import { settingsCard } from './settings.js';
 
 // Старт скромный: всё остальное добывается в играх. Буквы на первое слово — КОТ.
-const STARTER = { letters: 'КОТ' };
+// Стартовые буквы — ровно чтобы завести питомца: ЛАМА, КОТ, ПЁС или ЛИС
+const STARTER = { letters: 'ЛАМАКОТПЕСИ' };
 
 function editor(draft, onChange) {
   const preview = h('div.ch-preview');

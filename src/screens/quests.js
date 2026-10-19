@@ -31,11 +31,11 @@ export const QUESTS = [
   { id: 'q9', icon: '🃏', text: 'Сыграй в Пасьянс', go: 'solitaire', done: () => plays('solitaire') >= 1, reward: { energy: 8 } },
   { id: 'q10', icon: '🔥', text: 'Сожги что-нибудь в печи', tab: 'oven', done: () => state.oven.burned >= 1, reward: { energy: 8 } },
   { id: 'q11', icon: '🔍', text: 'Собери слово ЛУПА', go: 'erudite', done: () => made('ЛУПА') || state.items['ЛУПА'] > 0, reward: { energy: 7 } },
-  { id: 'q12', icon: '📋', text: 'Выполни заказ соседа', tab: 'orders', done: () => (state.progress.ordersDone || 0) >= 1, reward: { keys: 1 } },
+  { id: 'q12', icon: '💭', text: 'Исполни желание питомца', tab: 'pet', done: () => (state.pet?.wishesDone || 0) >= 1, reward: { keys: 1 } },
   { id: 'q13', icon: '🌲', text: 'Собери слово ЛЕС — откроется место', go: 'erudite', done: () => places().includes('ЛЕС'), reward: { energy: 10 } },
   { id: 'q14', icon: '🎁', text: 'Собери 8 разных вещей', go: 'hidden', done: () => kinds() >= 8, reward: { energy: 10 } },
   { id: 'q15', icon: '🗺️', text: 'Открой 4 места в Поиске', go: 'erudite', done: () => places().length >= 4, reward: { keys: 1 } },
-  { id: 'q16', icon: '🦮', text: 'Отправь питомца гулять', tab: 'pet', done: () => (state.pet?.walks || 0) >= 1, reward: { energy: 10, keys: 1 } },
+  { id: 'q16', icon: '🗺️', text: 'Отправь питомца в путешествие', tab: 'travel', done: () => (state.pet?.walks || 0) >= 1, reward: { energy: 10, keys: 1 } },
   { id: 'q17', icon: '🍬', text: 'Пройди 5 уровней Три в ряд', go: 'match3', done: () => state.progress.match3Level >= 6, reward: { keys: 2 } },
 ];
 
