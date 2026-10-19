@@ -605,6 +605,7 @@ const CSS = `
 .pt-status i { width: 9px; height: 9px; border-radius: 50%; background: var(--pt-l); display: block; }
 .pt-lvl { font-family: var(--display); font-weight: 800; font-size: 13px; background: #fff; color: #111; border-radius: 99px; padding: 6px 12px; }
 .pt-stage { position: relative; display: flex; justify-content: center; align-items: flex-end; padding: 34px 0 6px; margin: 0 -18px; min-height: 250px; }
+.pt-stage:not(.scened) { background: radial-gradient(ellipse 58% 52% at 52% 58%, #2c2a33 0%, #1a191e 55%, transparent 75%); }
 .pt-stage.scened { margin: 12px -6px 0; border-radius: 26px; overflow: hidden; }
 .pt-stage.away { min-height: 230px; }
 .pt-scene { position: absolute; inset: 0; width: 100%; height: 100%; }
