@@ -62,9 +62,9 @@ export const TRICKS = [
 
 // Рост: малыш — большая голова и короткая шея
 export const AGES = {
-  baby: { all: 0.8, head: 1.42, drop: 22 },
-  teen: { all: 0.9, head: 1.28, drop: 10 },
-  adult: { all: 1, head: 1.15, drop: 0 },
+  baby: { all: 0.8, head: 1.3, drop: 22 },
+  teen: { all: 0.9, head: 1.14, drop: 10 },
+  adult: { all: 1, head: 1.02, drop: 0 },
 };
 
 export const SLOTS = [
@@ -161,9 +161,10 @@ function furPart(id, pts, opts = {}, { stroke = 6, light = [-4, -7], strokes = 0
 }
 
 // силуэт тела вместе с шеей и грудкой
-const BODY_PTS = [[94, 118], [90, 150], [80, 180], [82, 208], [96, 236], [122, 256], [160, 266], [200, 268], [236, 262], [262, 246], [276, 220], [272, 192], [252, 175], [214, 167], [178, 169], [156, 163], [146, 142], [142, 118]];
-const HEAD_PTS = ellipsePts(114, 84, 46, 42, 18);
-const TUFT_PTS = [[80, 60], [86, 42], [100, 30], [118, 27], [136, 33], [148, 46], [150, 60], [138, 64], [124, 58], [112, 66], [100, 62], [90, 68]];
+const BODY_PTS = [[98, 78], [94, 112], [90, 150], [80, 180], [82, 208], [96, 236], [122, 256], [160, 266], [200, 268], [236, 262], [262, 246], [276, 220], [272, 192], [252, 175], [214, 167], [178, 169], [156, 163], [146, 142], [140, 110], [136, 78]];
+// голова ламы: широкая у глаз и ушей, книзу — длинная узкая морда
+const HEAD_PTS = [[114, 38], [140, 42], [158, 58], [163, 78], [156, 96], [145, 106], [141, 120], [136, 132], [126, 142], [114, 144], [102, 142], [92, 132], [87, 120], [83, 106], [72, 96], [65, 78], [70, 58], [88, 42]];
+const TUFT_PTS = [[88, 54], [92, 38], [104, 27], [122, 25], [138, 33], [146, 48], [136, 56], [124, 50], [112, 58], [100, 55]];
 const TAIL_PTS = ellipsePts(268, 180, 15, 21, 12, -0.5);
 
 const S = `stroke="${INK}" stroke-linejoin="round" stroke-linecap="round"`;
@@ -194,7 +195,7 @@ const eye = (side, cx, cy, r, clip, lash) => `<g class="ll-eye ll-eye-${side}">
   <path class="ll-eh" d="M${cx - r + 3} ${cy + 3} Q${cx} ${cy - r} ${cx + r - 3} ${cy + 3}"/>
   <path class="ll-es" d="M${cx - r + 3} ${cy - 2} Q${cx} ${cy + r * 0.7} ${cx + r - 3} ${cy - 2}"/></g>`;
 
-const DIRT = [[170, 236, 12, 7], [210, 218, 9, 6], [140, 252, 8, 5], [236, 198, 7, 4], [104, 204, 6, 4], [116, 282, 6, 4], [218, 284, 6, 4], [192, 248, 6, 4], [82, 104, 5, 3]];
+const DIRT = [[170, 236, 12, 7], [210, 218, 9, 6], [140, 252, 8, 5], [236, 198, 7, 4], [104, 204, 6, 4], [116, 282, 6, 4], [218, 284, 6, 4], [192, 248, 6, 4], [84, 112, 5, 3]];
 
 function svgMarkup(n) {
   const id = (k) => `ll${n}${k}`;
@@ -205,36 +206,37 @@ function svgMarkup(n) {
   <g class="ll-tail">${furPart(id('t'), TAIL_PTS, { step: 11, depth: 7, lean: 0.5, seed: 7 }, { stroke: 5.5, light: [-3, -5] })}</g>
   ${leg(116, 248, 'wm', n, true)}${leg(218, 252, 'wm', n, true)}
   <g class="ll-body">${furPart(id('b'), BODY_PTS, { step: 17, depth: 9, lean: 0.35, seed: 11 }, { stroke: 6.5, light: [-5, -9], strokes: 16, box: [90, 150, 270, 262], seed: 5,
-    inner: `<ellipse cx="118" cy="132" rx="34" ry="14" fill="rgba(90,55,25,.16)"/><ellipse cx="186" cy="274" rx="100" ry="18" fill="rgba(90,55,25,.14)"/>
+    inner: `<ellipse cx="117" cy="110" rx="26" ry="9" fill="rgba(90,55,25,.14)"/><ellipse cx="186" cy="274" rx="100" ry="18" fill="rgba(90,55,25,.14)"/>
       <path d="M170 182 q8 -5 16 -2 M200 178 q7 -4 14 -1 M104 150 q4 -6 10 -7" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" opacity=".85"/>` })}
     <path d="M100 206 Q112 226 134 236" fill="none" class="wsl" stroke-width="3" stroke-linecap="round" opacity=".9"/>
   </g>
   <g class="ll-dirt">${DIRT.map(([x, y, rx, ry]) => `<ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" fill="#8a5a32" opacity="0"/>`).join('')}</g>
   <g class="ll-slot-back"></g>
-  <g class="ll-slot-neck"></g>
+  <g class="ll-slot-neck" transform="translate(2 14)"></g>
   <g class="ll-head">
-    <g class="ll-ear-r"><g transform="translate(140 56) rotate(20)"><path d="M-12 2 C-19 -22 -12 -52 2 -66 C12 -50 17 -22 12 2 Z" class="ws" ${S} stroke-width="5"/>
-      <path d="M-5 -6 C-9 -26 -5 -44 2 -54 C7 -42 9 -24 5 -6 Z" fill="#e99ab0"/></g></g>
-    <g class="ll-ear-l"><g transform="translate(86 60) rotate(-22)"><path d="M-12 2 C-17 -22 -12 -52 -2 -66 C12 -52 19 -22 12 2 Z" class="wm" ${S} stroke-width="5"/>
-      <path d="M-5 -6 C-7 -24 -5 -42 -2 -54 C5 -44 9 -26 5 -6 Z" fill="#ffb3c7"/><path d="M-3 -12 C-4 -26 -3 -38 -1 -46" fill="none" stroke="#ff8fb0" stroke-width="2.5" stroke-linecap="round"/></g></g>
-    ${furPart(id('h'), HEAD_PTS, { step: 14, depth: 6, lean: 0.25, seed: 23 }, { stroke: 6, light: [-4, -6], inner: `<ellipse cx="146" cy="110" rx="18" ry="22" fill="rgba(90,55,25,.1)"/>` })}
-    <ellipse class="ll-cheek" cx="76" cy="106" rx="9" ry="5.5" fill="#ff8fb0"/><ellipse class="ll-cheek" cx="152" cy="104" rx="8" ry="5" fill="#ff8fb0"/>
-    ${eye('l', 94, 86, 17, id('ea'), -1)}${eye('r', 136, 84, 15, id('eb'), 1)}
-    <path d="M86 112 C86 98 138 98 138 112 C140 126 128 136 112 136 C96 136 84 126 86 112 Z" class="wf" ${S} stroke-width="4.5"/>
-    <path d="M92 112 C94 104 108 102 112 104" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="3.5" stroke-linecap="round"/>
-    <path d="M101 106 Q112 100 123 106 Q118 114 112 113 Q106 114 101 106 Z" fill="${INK}"/>
-    <ellipse cx="106" cy="105.5" rx="2.2" ry="1.2" fill="#555"/>
-    <path d="M112 112 L112 121" fill="none" ${S} stroke-width="3.5"/>
+    <g class="ll-ear-r"><g transform="translate(142 48) rotate(24)"><path d="M-11 4 C-20 -22 -14 -56 4 -74 C14 -56 17 -24 11 4 Z" class="ws" ${S} stroke-width="5"/>
+      <path d="M-4 -4 C-10 -26 -6 -48 3 -62 C8 -46 9 -24 4 -4 Z" fill="#e99ab0"/></g></g>
+    <g class="ll-ear-l"><g transform="translate(86 50) rotate(-24)"><path d="M-11 4 C-17 -24 -14 -56 -4 -74 C14 -56 20 -22 11 4 Z" class="wm" ${S} stroke-width="5"/>
+      <path d="M-4 -4 C-9 -24 -8 -46 -3 -62 C6 -48 10 -26 4 -4 Z" fill="#ffb3c7"/><path d="M-2 -12 C-4 -28 -4 -42 -2 -52" fill="none" stroke="#ff8fb0" stroke-width="2.5" stroke-linecap="round"/></g></g>
+    ${furPart(id('h'), HEAD_PTS, { step: 14, depth: 6, lean: 0.25, seed: 23 }, { stroke: 6, light: [-4, -6], inner: `<ellipse cx="150" cy="96" rx="14" ry="20" fill="rgba(90,55,25,.1)"/>` })}
+    <ellipse class="ll-cheek" cx="80" cy="98" rx="8" ry="5" fill="#ff8fb0"/><ellipse class="ll-cheek" cx="149" cy="97" rx="7" ry="4.5" fill="#ff8fb0"/>
+    ${eye('l', 92, 76, 16, id('ea'), -1)}${eye('r', 137, 74, 14, id('eb'), 1)}
+    <path d="M101 91 C107 85 121 85 127 91 C136 103 141 128 135 144 C129 156 99 156 93 144 C87 128 92 103 101 91 Z" class="wf" ${S} stroke-width="4.5"/>
+    <path d="M104 95 C107 90 113 89 117 90" fill="none" stroke="rgba(255,255,255,.6)" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M100 135 C104 146 124 146 128 135" fill="none" stroke="rgba(90,55,25,.18)" stroke-width="6" stroke-linecap="round"/>
+    <path d="M97 110 Q102 103 109 106 Q108 113 101 115 Q96 115 97 110 Z M131 110 Q126 103 119 106 Q120 113 127 115 Q132 115 131 110 Z" fill="${INK}"/>
+    <path d="M100 108 q2 -2 5 -2 M128 108 q-2 -2 -5 -2" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round"/>
+    <path d="M114 109 L114 128" fill="none" ${S} stroke-width="3.5"/>
     <path class="ll-mouth" d="" fill="none" ${S} stroke-width="4"/>
-    <g class="ll-open"><path d="M96 124 Q112 166 128 124 Z" fill="${INK}" ${S} stroke-width="3"/>
-      <ellipse cx="112" cy="140" rx="8" ry="5.5" fill="#ff7f9e"/>
-      <rect x="104" y="123" width="7.5" height="8" rx="1.5" fill="#fff" ${S} stroke-width="2"/><rect x="112.5" y="123" width="7.5" height="8" rx="1.5" fill="#fff" ${S} stroke-width="2"/></g>
+    <g class="ll-open"><path d="M99 130 Q114 172 129 130 Z" fill="${INK}" ${S} stroke-width="3"/>
+      <ellipse cx="114" cy="147" rx="7.5" ry="5.5" fill="#ff7f9e"/>
+      <rect x="106" y="129" width="7.5" height="8" rx="1.5" fill="#fff" ${S} stroke-width="2"/><rect x="114.5" y="129" width="7.5" height="8" rx="1.5" fill="#fff" ${S} stroke-width="2"/></g>
     <g class="ll-tuft">${furPart(id('f'), TUFT_PTS, { step: 11, depth: 6, lean: -0.45, seed: 31 }, { stroke: 5.5, light: [-3, -5],
       inner: `<path d="M98 40 q6 -6 13 -6 M118 36 q6 -2 11 1" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".9"/>` })}</g>
     <g class="ll-brows"><path class="ll-bl" d="" fill="none" ${S} stroke-width="5"/><path class="ll-br" d="" fill="none" ${S} stroke-width="5"/></g>
-    <g class="ll-slot-eyes"></g>
-    <g class="ll-slot-head"></g>
-    <circle class="ll-mpt" cx="112" cy="128" r="0.5" fill="none"/><circle class="ll-hpt" cx="114" cy="40" r="0.5" fill="none"/>
+    <g class="ll-slot-eyes" transform="translate(-1 -10)"></g>
+    <g class="ll-slot-head" transform="translate(0 -6)"></g>
+    <circle class="ll-mpt" cx="114" cy="134" r="0.5" fill="none"/><circle class="ll-hpt" cx="114" cy="30" r="0.5" fill="none"/>
   </g>
 </g></svg>`;
 }
@@ -326,14 +328,14 @@ const ITEM_SVG = {
 };
 
 const MOUTH = {
-  smile: 'M98 123 Q105 130 112 123 Q119 130 126 123',
-  sad: 'M100 130 Q112 121 124 130',
-  flat: 'M101 126 L123 126',
-  small: 'M106 125 Q112 129 118 125',
+  smile: 'M100 130 Q107 137 114 130 Q121 137 128 130',
+  sad: 'M102 138 Q114 129 126 138',
+  flat: 'M103 134 L125 134',
+  small: 'M108 132 Q114 136 120 132',
 };
 const BROW = {
-  sad: ['M80 66 L104 58', 'M126 57 L148 64'],
-  angry: ['M80 58 L104 67', 'M126 66 L148 57'],
+  sad: ['M78 56 L102 49', 'M127 48 L148 55'],
+  angry: ['M78 49 L102 57', 'M127 56 L148 48'],
 };
 
 let cssDone = false;
@@ -481,21 +483,21 @@ export function createLlama({ onPet, onPoke, onWake, onSpit, still = false } = {
     if (spinV) { spin += spinV; if (spin >= 360) { spin = 0; spinV = 0; } }
     P.all.setAttribute('transform', `translate(0 ${hopY.toFixed(2)}) rotate(${spin.toFixed(1)} 165 220) translate(165 312) scale(${((1 - sq * 0.6) * age.all).toFixed(4)} ${((1 + sq) * age.all).toFixed(4)}) translate(-165 -312)`);
     P.body.setAttribute('transform', `translate(170 276) scale(${(1 + br * 0.008).toFixed(4)} ${(1 + br * (asleep ? 0.03 : 0.016)).toFixed(4)}) translate(-170 -276)`);
-    P.head.setAttribute('transform', `translate(0 ${(bob + age.drop).toFixed(2)}) rotate(${(tl + (asleep ? 7 : 0)).toFixed(2)} 116 140) translate(116 140) scale(${age.head}) translate(-116 -140)`);
-    P.earL.setAttribute('transform', `rotate(${eL.toFixed(2)} 86 60)`);
-    P.earR.setAttribute('transform', `rotate(${eR.toFixed(2)} 140 56)`);
+    P.head.setAttribute('transform', `translate(0 ${(bob + age.drop * 1.4 - 40).toFixed(2)}) rotate(${(tl + (asleep ? 7 : 0)).toFixed(2)} 116 150) translate(116 150) scale(${age.head}) translate(-116 -150)`);
+    P.earL.setAttribute('transform', `rotate(${eL.toFixed(2)} 86 50)`);
+    P.earR.setAttribute('transform', `rotate(${eR.toFixed(2)} 142 48)`);
     P.tail.setAttribute('transform', `rotate(${(Math.sin(t * (mood === 'happy' || mode === 'joy' ? 9 : 2)) * 8).toFixed(2)} 258 186)`);
     if (P.bell) P.bell.setAttribute('transform', `rotate(${(sw * 1.5).toFixed(2)} 114 162)`);
     const big = mode === 'want' ? 1.25 : 1;
     const lx = look.x.x, ly = look.y.x;
-    P.pupL.setAttribute('transform', `translate(${(lx * 6).toFixed(2)} ${(ly * 5).toFixed(2)}) translate(94 86) scale(${big}) translate(-94 -86)`);
-    P.pupR.setAttribute('transform', `translate(${(lx * 5).toFixed(2)} ${(ly * 4.5).toFixed(2)}) translate(136 84) scale(${big}) translate(-136 -84)`);
-    P.lidL.setAttribute('height', (lid * 40).toFixed(1));
-    P.lidR.setAttribute('height', (lid * 36).toFixed(1));
+    P.pupL.setAttribute('transform', `translate(${(lx * 6).toFixed(2)} ${(ly * 5).toFixed(2)}) translate(92 76) scale(${big}) translate(-92 -76)`);
+    P.pupR.setAttribute('transform', `translate(${(lx * 5).toFixed(2)} ${(ly * 4.5).toFixed(2)}) translate(137 74) scale(${big}) translate(-137 -74)`);
+    P.lidL.setAttribute('height', (lid * 38).toFixed(1));
+    P.lidR.setAttribute('height', (lid * 34).toFixed(1));
     for (const c of P.cheeks) c.setAttribute('opacity', (0.35 + bl * 0.6).toFixed(2));
 
     const chew = mode === 'eat' ? 0.55 + Math.abs(Math.sin(t * 11)) * 0.5 : mode === 'want' ? 1.1 : 1;
-    P.open.setAttribute('transform', `translate(112 124) scale(1 ${chew.toFixed(3)}) translate(-112 -124)`);
+    P.open.setAttribute('transform', `translate(114 130) scale(1 ${chew.toFixed(3)}) translate(-114 -130)`);
     P.mouth.setAttribute('transform', now < chewUntil ? `translate(${(Math.sin(t * 9) * 2.6).toFixed(2)} 0)` : '');
 
     if (asleep && mode !== 'pet' && now > nextZ) { nextZ = now + 1500; puff('z', 150, 30, 'z'); }

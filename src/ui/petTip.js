@@ -39,7 +39,7 @@ const CSS = `
   transform: translateY(130%); transition: transform .35s cubic-bezier(.2,1.4,.4,1); pointer-events: auto; }
 .ptip.on { transform: none; }
 .ptip-ava { flex: none; width: 74px; height: 74px; border-radius: 50%; background: #111; box-shadow: 0 0 0 3px #c8ff2e; overflow: hidden; position: relative; }
-.ptip-pet.ll-wrap { position: absolute; width: 150px; left: -22px; top: -6px; }
+.ptip-pet.ll-wrap { position: absolute; width: 150px; left: -20px; top: -4px; }
 .ptip-pet.ep { position: absolute; inset: 0; display: grid; place-items: center; }
 .ptip-pet .ep-e { font-size: 50px !important; }
 .ptip-say { background: #fff; color: #111; border-radius: 20px 20px 20px 4px; padding: 9px 14px; box-shadow: 0 0 0 3px #111, 0 4px 0 3px #111;
