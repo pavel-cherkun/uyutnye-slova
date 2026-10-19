@@ -82,6 +82,12 @@ const SOUNDS = {
   reward: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.08, 0.18, { type: 'triangle', vol: 0.09 })),
   win: () => [784, 988, 1175].forEach((f, i) => tone(f, i * 0.06, 0.12, { type: 'sine', vol: 0.07 })),
   error: () => tone(220, 0, 0.18, { type: 'sawtooth', vol: 0.05, slide: 0.7 }),
+  // питомец
+  boop: () => tone(520, 0, 0.09, { type: 'sine', vol: 0.08, slide: 1.9 }),
+  hum: () => { tone(196, 0, 0.5, { type: 'triangle', vol: 0.05, slide: 1.15 }); tone(247, 0.05, 0.45, { type: 'sine', vol: 0.03 }); },
+  munch: () => [0, 0.09].forEach((s) => tone(140 + Math.random() * 60, s, 0.06, { type: 'square', vol: 0.03, slide: 0.6 })),
+  spit: () => { tone(900, 0, 0.18, { type: 'sawtooth', vol: 0.05, slide: 0.25 }); tone(300, 0.05, 0.12, { type: 'square', vol: 0.03, slide: 0.5 }); },
+  happy: () => [660, 880, 1100].forEach((f, i) => tone(f, i * 0.07, 0.1, { type: 'triangle', vol: 0.06, slide: 1.2 })),
 };
 
 export function sfx(name) {
