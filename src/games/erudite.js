@@ -11,6 +11,7 @@ import { dictWords, dictCat } from '../data/dict.js';
 import { nextStage, checkLetterUnlock, wordsCount, gainXP, WORD_XP } from '../progression.js';
 import { floatText } from '../ui/fx.js';
 import { sfx, buzz } from '../ui/device.js';
+import { petTip } from '../ui/petTip.js';
 
 // Что делают инструменты — подсказка прямо в превью слова
 const TOOL_USE = { МОЛОТОК: 'бустер для «Три в ряд»', ЛУПА: 'подсказка в «Поиске»' };
@@ -162,6 +163,7 @@ export function mount(root, ctx) {
   let topRank = -1;       // высшая редкость, достигнутая при наборе текущего слова
   let lastLen = 0;
   const timers = new Set();
+  let markWord = () => {};
   const later = (fn, ms) => { const t = setTimeout(() => { timers.delete(t); fn(); }, ms); timers.add(t); };
 
   const wordEl = h('div.er-word');
@@ -365,6 +367,7 @@ export function mount(root, ctx) {
     }
     if (!store.spendLetters(w)) { toast('Не хватает букв'); sfx('error'); return; }
     todayWords(state).push(w);
+    markWord();
 
     const first = !state.progress.wordsMade[w];
     state.progress.wordsMade[w] = (state.progress.wordsMade[w] || 0) + 1;
@@ -413,8 +416,8 @@ export function mount(root, ctx) {
     }
   }
 
-  function hint() {
-    // быстрая проверка «хватает ли букв» без лишних аллокаций
+  /** Лучшее слово из текущих букв: { w } | { none: 'letters' | 'today' } */
+  function bestIdea() {
     const have = { ...state.letters };
     const fits = (w) => {
       const used = {};
@@ -422,8 +425,7 @@ export function mount(root, ctx) {
       return true;
     };
     const can = allWords().filter((w) => w.length >= 3 && fits(w));
-    if (!can.length) { toast('Букв маловато — сыграй в Блоки 🎯', 2400); return; }
-    if (!store.spendEnergy(HINT_COST)) { toast('Нужно ' + HINT_COST + ' ⚡'); return; }
+    if (!can.length) return { none: 'letters' };
     // сначала комнаты, потом предметы, карточки, эссенции, «разное»; среди них — новые слова
     const scored = can.map((w) => {
       const c = classifyWord(w);
@@ -434,16 +436,38 @@ export function mount(root, ctx) {
       return { w, rank: rank + (fresh ? 0 : 10) };
     });
     const top = Math.min(...scored.map((x) => x.rank));
-    if (top >= 99) { store.addEnergy(HINT_COST); toast('Новых слов из этих букв сегодня нет — добудь буквы в Блоках', 2800); return; }
-    const w = pick(scored.filter((x) => x.rank === top)).w;
+    if (top >= 99) return { none: 'today' };
+    return { w: pick(scored.filter((x) => x.rank === top)).w };
+  }
+
+  function hint() {
+    const idea = bestIdea();
+    if (idea.none === 'letters') { toast('Букв маловато — сыграй в Блоки 🎯', 2400); return; }
+    if (idea.none === 'today') { toast('Новых слов из этих букв сегодня нет — добудь буквы в Блоках', 2800); return; }
+    if (!store.spendEnergy(HINT_COST)) { toast('Нужно ' + HINT_COST + ' ⚡'); return; }
+    const w = idea.w;
     word = [...w];
     topRank = -1; lastLen = 0;
     render();
     toast('Попробуй это слово 😉');
   }
 
+  // питомец подсказывает слово, если долго ничего не получается (бесплатно, раз в минуту)
+  let lastWordAt = Date.now(), lastIdea = 0;
+  const idleTimer = setInterval(() => {
+    if (!root.isConnected) return;
+    const now = Date.now();
+    if (now - lastWordAt < 30000 || now - lastIdea < 60000) return;
+    const idea = bestIdea();
+    lastIdea = now;
+    if (idea.w) petTip(`Может, «${idea.w}»? 😉`, 5000);
+    else if (idea.none === 'letters') petTip('Букв мало — сыграем в Блоки?', 4500);
+  }, 5000);
+  markWord = () => { lastWordAt = Date.now(); };
+
   render();
   return () => {
+    clearInterval(idleTimer);
     timers.forEach(clearTimeout);
     document.querySelectorAll('.er-fly, .er-flash, .er-burst, .er-ring, .er-part').forEach((e) => e.remove());
   };
