@@ -50,6 +50,22 @@ export const WARDROBE = [
   { slot: 'back', id: 'plaid', word: 'ПЛЕД', name: 'Плед', icon: '🟩' },
   { slot: 'back', id: 'rainbow', word: 'РАДУГА', name: 'Радуга', icon: '🌈' },
 ];
+// Трюки: покупаются словом, потом лама показывает их по кнопке (и иногда сама)
+export const TRICKS = [
+  { id: 'dance', word: 'ТАНЕЦ', name: 'Танец', icon: '💃' },
+  { id: 'bow', word: 'ПОКЛОН', name: 'Поклон', icon: '🙇' },
+  { id: 'sneeze', word: 'ЧИХ', name: 'Чих', icon: '🤧' },
+  { id: 'song', word: 'ПЕСНЯ', name: 'Песня', icon: '🎵' },
+  { id: 'flip', word: 'САЛЬТО', name: 'Сальто', icon: '🤸' },
+];
+
+// Рост: малыш — большая голова и короткая шея
+export const AGES = {
+  baby: { all: 0.8, head: 1.42, drop: 22 },
+  teen: { all: 0.9, head: 1.28, drop: 10 },
+  adult: { all: 1, head: 1.15, drop: 0 },
+};
+
 export const SLOTS = [
   { id: 'wool', name: 'Шерсть', icon: '🧶' },
   { id: 'head', name: 'Голова', icon: '🎩' },
@@ -122,6 +138,7 @@ function svgMarkup(n) {
     <g class="ll-brows"><path class="ll-bl" d="" fill="none" ${S} stroke-width="5"/><path class="ll-br" d="" fill="none" ${S} stroke-width="5"/></g>
     <g class="ll-slot-eyes"></g>
     <g class="ll-slot-head"></g>
+    <circle class="ll-mpt" cx="112" cy="128" r="0.5" fill="none"/><circle class="ll-hpt" cx="114" cy="40" r="0.5" fill="none"/>
   </g>
 </g></svg>`;
 }
@@ -278,6 +295,7 @@ export function createLlama({ onPet, onPoke, onWake, onSpit, still = false } = {
   let lastPointer = 0, nextZ = 0, lastHum = 0;
   let taps = [], spitCool = 0;
   let mounted = false, raf = 0;
+  let age = AGES.adult, spin = 0, spinV = 0, tricks = [];
 
   const toWrap = (x, y) => { const s = wrap.clientWidth / 300; return [x * s, (y + 14) * s]; };
   const fromClient = (cx, cy) => {
@@ -364,9 +382,10 @@ export function createLlama({ onPet, onPoke, onWake, onSpit, still = false } = {
     const eL = earL.step(), eR = earR.step();
     const bl = blush.step();
 
-    P.all.setAttribute('transform', `translate(0 ${hopY.toFixed(2)}) translate(165 312) scale(${(1 - sq * 0.6).toFixed(4)} ${(1 + sq).toFixed(4)}) translate(-165 -312)`);
+    if (spinV) { spin += spinV; if (spin >= 360) { spin = 0; spinV = 0; } }
+    P.all.setAttribute('transform', `translate(0 ${hopY.toFixed(2)}) rotate(${spin.toFixed(1)} 165 220) translate(165 312) scale(${((1 - sq * 0.6) * age.all).toFixed(4)} ${((1 + sq) * age.all).toFixed(4)}) translate(-165 -312)`);
     P.body.setAttribute('transform', `translate(170 276) scale(${(1 + br * 0.008).toFixed(4)} ${(1 + br * (asleep ? 0.03 : 0.016)).toFixed(4)}) translate(-170 -276)`);
-    P.head.setAttribute('transform', `translate(0 ${bob.toFixed(2)}) rotate(${(tl + (asleep ? 7 : 0)).toFixed(2)} 116 140) translate(116 140) scale(1.15) translate(-116 -140)`);
+    P.head.setAttribute('transform', `translate(0 ${(bob + age.drop).toFixed(2)}) rotate(${(tl + (asleep ? 7 : 0)).toFixed(2)} 116 140) translate(116 140) scale(${age.head}) translate(-116 -140)`);
     P.earL.setAttribute('transform', `rotate(${eL.toFixed(2)} 86 60)`);
     P.earR.setAttribute('transform', `rotate(${eR.toFixed(2)} 140 56)`);
     P.tail.setAttribute('transform', `rotate(${(Math.sin(t * (mood === 'happy' || mode === 'joy' ? 9 : 2)) * 8).toFixed(2)} 258 186)`);
@@ -400,7 +419,37 @@ export function createLlama({ onPet, onPoke, onWake, onSpit, still = false } = {
     else if (r < 0.62) { tilt.t = rnd(-9, 9); setTimeout(() => (tilt.t = 0), rnd(900, 1800)); }
     else if (r < 0.75 && mood === 'happy') { hop(6); setTimeout(() => hop(5), 380); }
     else if (r < 0.85 && mood === 'happy') { sfx('hum'); puff('♪', 60, 60, 'note'); }
+    else if (r < 0.92 && tricks.length && mood === 'happy') perform(tricks[Math.floor(Math.random() * tricks.length)]);
     else { twitch('l'); setTimeout(() => twitch('r'), 160); }
+  }
+
+  // ---------- трюки ----------
+  function perform(id) {
+    if (asleep) { asleep = false; groggyUntil = 0; }
+    if (id === 'dance') {
+      setMode('joy', 1900);
+      [0, 380, 760, 1140, 1520].forEach((d, i) => setTimeout(() => { tilt.t = i % 2 ? 12 : -12; hop(6); if (i % 2) puff('♪', 60 + Math.random() * 180, 40, 'note'); }, d));
+      setTimeout(() => (tilt.t = 0), 1900);
+      sfx('happy');
+    } else if (id === 'bow') {
+      setMode('joy', 1300);
+      tilt.t = -22; earL.v -= 6; earR.v += 6;
+      setTimeout(() => { tilt.t = 0; say('✨', 900); }, 900);
+    } else if (id === 'sneeze') {
+      setMode('angry', 500);
+      tilt.t = 6;
+      setTimeout(() => { tilt.t = -14; squash.v -= 0.12; sfx('spit'); puff('💨', 70, 130); say('Апчхи!', 1100); setMode('joy', 600); }, 450);
+      setTimeout(() => (tilt.t = 0), 900);
+    } else if (id === 'song') {
+      setMode('want', 1800);
+      [0, 450, 900, 1350].forEach((d) => setTimeout(() => { sfx('hum'); puff(Math.random() < 0.5 ? '♪' : '♫', 60 + Math.random() * 60, 70, 'note'); tilt.t = Math.random() * 10 - 5; }, d));
+      setTimeout(() => (tilt.t = 0), 1800);
+    } else if (id === 'flip') {
+      setMode('joy', 1200);
+      hopV = -15; spinV = 13;
+      sfx('happy');
+      setTimeout(() => say('Та-дам!', 1100), 900);
+    }
   }
 
   // ---------- касания ----------
@@ -512,6 +561,15 @@ export function createLlama({ onPet, onPoke, onWake, onSpit, still = false } = {
       refreshFace();
     },
     get asleep() { return asleep; },
+    perform,
+    /** Какие трюки знает (иногда показывает сама, когда довольна) */
+    setTricks(list) { tricks = list || []; },
+    /** Возраст: baby | teen | adult */
+    setAge(a) { age = AGES[a] || AGES.adult; },
+    /** Где макушка — для мяча */
+    headClient() { const r = q('.ll-hpt').getBoundingClientRect(); return { x: r.left, y: r.top }; },
+    /** Отбить мяч головой */
+    bump() { if (asleep) { asleep = false; groggyUntil = 0; refreshFace(); } hopV = -8; squash.v -= 0.08; tilt.v -= 4; sfx('boop'); setMode('joy', 500); },
     /** Наряд: { wool, head, eyes, neck, back } */
     setLook(lk = {}) {
       const [m, s] = WOOL[lk.wool] || WOOL.cream;
@@ -527,10 +585,7 @@ export function createLlama({ onPet, onPoke, onWake, onSpit, still = false } = {
     setDirt(d) { P.dirt.forEach((e, i) => e.setAttribute('opacity', d > (i + 0.5) / P.dirt.length ? '0.75' : '0')); },
     lookAtClient(cx, cy) { lastPointer = performance.now(); const [sx, sy] = fromClient(cx, cy); aim(sx, sy); },
     /** Где рот — в координатах экрана */
-    mouthClient() {
-      const r = svg.getBoundingClientRect(), s = r.width / 300;
-      return { x: r.left + 111 * s, y: r.top + (124 + 14) * s }; // с учётом увеличенной головы
-    },
+    mouthClient() { const r = q('.ll-mpt').getBoundingClientRect(); return { x: r.left, y: r.top }; },
     /** Еда рядом — открывает рот */
     want(on) {
       if (asleep && on) { asleep = false; groggyUntil = performance.now() + 4000; onWake?.(); }
