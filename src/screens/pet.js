@@ -7,16 +7,17 @@ import { state, commit, removeItem, applyReward } from '../state.js';
 import { ITEMS, getItem, CATEGORIES, eatValue } from '../data/items.js';
 import { gainXP, chestReward } from '../progression.js';
 import { randomLetter } from '../data/letters.js';
-import { createLlama } from '../ui/llama.js';
+import { createLlama, WARDROBE, SLOTS, WOOL, itemPreview } from '../ui/llama.js';
+import { spellModal } from '../ui/spell.js';
 
 const KINDS = [
-  { kind: 'llama', emoji: '🦙', name: 'Лама' },
-  { kind: 'cat', emoji: '🐈', name: 'Кот' },
-  { kind: 'dog', emoji: '🐕', name: 'Пёс' },
-  { kind: 'hamster', emoji: '🐹', name: 'Хомяк' },
-  { kind: 'rabbit', emoji: '🐇', name: 'Кролик' },
-  { kind: 'parrot', emoji: '🦜', name: 'Попугай' },
-  { kind: 'fox', emoji: '🦊', name: 'Лис' },
+  { kind: 'llama', emoji: '🦙', name: 'Лама', word: 'ЛАМА' },
+  { kind: 'cat', emoji: '🐈', name: 'Кот', word: 'КОТ' },
+  { kind: 'dog', emoji: '🐕', name: 'Пёс', word: 'ПЕС' },
+  { kind: 'hamster', emoji: '🐹', name: 'Хомяк', word: 'ХОМЯК' },
+  { kind: 'rabbit', emoji: '🐇', name: 'Кролик', word: 'КРОЛИК' },
+  { kind: 'parrot', emoji: '🦜', name: 'Попугай', word: 'ПОПУГАЙ' },
+  { kind: 'fox', emoji: '🦊', name: 'Лис', word: 'ЛИС' },
 ];
 
 const MIN = 60 * 1000;
@@ -58,6 +59,11 @@ function tick(p, write = true) {
   out.food = Math.max(0, out.food - n);
   out.joy = Math.max(0, out.joy - n);
   out.lastTick = (p.lastTick || now) + n * TICK;
+  // миска: проголодавшись, питомец сам ест из неё
+  if (p.bowl?.length) {
+    out.bowl = [...p.bowl];
+    while (out.food < 60 && out.bowl.length) out.food = clamp(out.food + (eatValue(out.bowl.shift()) || 4) * 4);
+  }
   if (write) commit();
   return out;
 }
@@ -79,7 +85,7 @@ export function petBadge() {
   if (!p0) return 0;
   const p = tick(p0, false);
   if (p.walk && Date.now() >= p.walk.end) return 1;
-  if (!p.walk && p.food < 30) return 1;
+  if (!p.walk && p.food < 30 && !p.bowl?.length) return 1;
   return 0;
 }
 
@@ -105,17 +111,20 @@ function adoptView(rerender) {
       pickedKind = k.kind;
       for (const b of kinds.children) b.classList.toggle('on', b === e.currentTarget);
     },
-  }, h('span.pt-kind-e', k.emoji), h('span.pt-kind-n', k.name))));
+  }, h('span.pt-kind-e', k.emoji), h('span.pt-kind-n', k.name), wordTiles(k.word))));
   const adopt = () => {
     const name = input.value.trim().replace(/\s+/g, ' ');
     if (!name) { toast('Придумай кличку'); input.focus(); return; }
-    const k = KINDS.find((x) => x.kind === pickedKind) || KINDS[1];
-    const now = Date.now();
-    state.pet = { kind: k.kind, emoji: k.emoji, name: name[0].toUpperCase() + name.slice(1), level: 1, xp: 0, food: 70, joy: 70,
-      walk: null, outfit: null, born: now, lastTick: now, walks: 0, meters: 0 };
-    commit();
-    confetti();
-    rerender();
+    const k = KINDS.find((x) => x.kind === pickedKind) || KINDS[0];
+    // завести = набрать название зверя своими буквами
+    spellModal({ word: k.word, title: `Завести: ${k.name.toLowerCase()}`, icon: kindIcon(k), sub: `Набери «${k.word}» своими буквами`,
+      onDone: () => {
+        const now = Date.now();
+        state.pet = { kind: k.kind, emoji: k.emoji, name: name[0].toUpperCase() + name.slice(1), level: 1, xp: 0, food: 70, joy: 70, clean: 100,
+          walk: null, outfit: null, born: now, lastTick: now, walks: 0, meters: 0, owned: [k.kind], bowl: [], look: { wool: 'cream' }, wardrobe: ['wool:cream'] };
+        commit();
+        rerender();
+      } });
   };
   return h('div.pt-stack',
     h('div.pt-hero.pt-adopt',
@@ -132,7 +141,7 @@ function adoptView(rerender) {
 function homeView(p, rerender, nav) {
   const kind = KINDS.find((k) => k.kind === p.kind) || KINDS[0];
   const outfit = p.outfit && state.items[p.outfit] ? getItem(p.outfit) : null;
-  const refs = { food: h('b', p.food + '%'), joy: h('b', p.joy + '%') };
+  const refs = { food: h('b', p.food + '%'), joy: h('b', p.joy + '%'), clean: h('b', (p.clean ?? 100) + '%') };
   const isLlama = p.kind === 'llama';
   const card = isLlama ? llamaCard(p, kind, outfit, refs, rerender) : emojiCard(p, kind, outfit, refs, rerender);
 
@@ -141,8 +150,9 @@ function homeView(p, rerender, nav) {
     tile('white', '🍖', 'Сытость', refs.food, bar(p.food)),
     tile('gray', '❤️', 'Радость', refs.joy, bar(p.joy)),
     tile('gray', '⭐', 'Уровень', h('b', String(p.level)), bar(xpPct)),
+    isLlama ? tile('white', '🫧', 'Чистота', refs.clean, bar(p.clean ?? 100)) : null,
     tile('white', '🦮', 'Прогулок', h('b', String(p.walks || 0))),
-    tile('white wide', '📍', 'Пройдено', h('b', ((p.meters || 0) / 1000).toFixed(1).replace('.', ',') + ' км')),
+    tile(isLlama ? 'gray' : 'white wide', '📍', 'Пройдено', h('b', ((p.meters || 0) / 1000).toFixed(1).replace('.', ',') + ' км')),
   );
 
   // одна подсказка о новом звере для тех, кто завёл питомца раньше
@@ -159,7 +169,7 @@ function homeView(p, rerender, nav) {
     card,
     h('div.pt-acts',
       roundBtn('🍖', 'Покормить', () => feedModal(p, rerender, nav)),
-      roundBtn('🎀', 'Нарядить', () => outfitModal(p, rerender, nav)),
+      roundBtn('🎀', 'Нарядить', () => (isLlama ? wardrobeModal(p, rerender) : outfitModal(p, rerender, nav))),
       roundBtn('🎁', 'Подарить', () => giftModal(p, rerender)),
     ),
     h('div.pt-sec', 'Прогулка'),
@@ -192,9 +202,16 @@ function kindModal(p, rerender) {
   m = modal([
     h('div.modal-title', 'Кто это?'),
     h('div.pt-m-sub', 'Имя и уровень останутся'),
-    h('div.pt-kinds', KINDS.map((k) => h('button.pt-kind' + (k.kind === p.kind ? '.on' : ''), {
-      onclick: () => { p.kind = k.kind; p.emoji = k.emoji; commit(); m.close(); },
-    }, h('span.pt-kind-e', k.emoji), h('span.pt-kind-n', k.name)))),
+    h('div.pt-kinds', KINDS.map((k) => {
+      const owned = (p.owned ||= [p.kind]).includes(k.kind);
+      return h('button.pt-kind' + (k.kind === p.kind ? '.on' : ''), {
+        onclick: () => {
+          const go = () => { if (!p.owned.includes(k.kind)) p.owned.push(k.kind); p.kind = k.kind; p.emoji = k.emoji; commit(); m.close(); };
+          if (owned) go();
+          else spellModal({ word: k.word, title: `Завести: ${k.name.toLowerCase()}`, icon: kindIcon(k), sub: `Набери «${k.word}» своими буквами`, onDone: go });
+        },
+      }, h('span.pt-kind-e', k.emoji), h('span.pt-kind-n', k.name), owned ? h('span.pt-kind-ok', '✓') : wordTiles(k.word));
+    })),
     h('button.btn.btn-ghost', { onclick: () => m.close() }, 'Готово'),
   ], { onClose: rerender });
 }
@@ -224,24 +241,37 @@ function emojiCard(p, kind, outfit, refs, rerender) {
 // ---------- Живая лама ----------
 const isNight = () => { const hr = new Date().getHours(); return hr >= 23 || hr < 7; };
 
+/** Иконка зверя для окна набора: лама — живая картинка, остальные — эмодзи */
+function kindIcon(k) {
+  if (k.kind !== 'llama') return k.emoji;
+  const ll = createLlama({ still: true });
+  ll.setLook({ wool: 'cream' });
+  return h('div.pt-mini', ll.el);
+}
+/** Слово-цена маленькими плитками */
+function wordTiles(word) { return h('span.pt-price', ...word.split('').map((ch) => h('span.ltr', ch))); }
+
 function llamaCard(p, kind, outfit, refs, rerender) {
   const tut = (p.tut ||= {});
+  p.bowl ||= [];
+  p.look ||= { wool: 'cream' };
+  if (p.clean == null) p.clean = 100;
   let petGain = 0;
+  const mood = () => ({ food: p.food, joy: p.joy, sleep: isNight() && Date.now() - wokeAt > 10 * MIN });
   const addJoy = (n) => {
     p.joy = clamp(p.joy + n);
     refs.joy.textContent = p.joy + '%';
     ll.setMood(mood());
     commit();
   };
-  const mood = () => ({ food: p.food, joy: p.joy, sleep: isNight() && Date.now() - wokeAt > 10 * MIN });
+  const learned = (k) => { if (!tut[k]) { tut[k] = true; commit(); if (tut.pet && tut.fed && tut.brush) hint?.remove(); } };
   const ll = createLlama({
     onPet: () => {
-      if (!tut.pet) { tut.pet = true; hint.remove(); commit(); }
+      learned('pet');
       const now = Date.now();
       if (now - lastPet < 1200) return;
       lastPet = now;
-      petGain++;
-      if (petGain <= 15) addJoy(2); // за один заход — до +30 радости поглаживаниями
+      if (++petGain <= 15) addJoy(2); // за один заход — до +30 радости поглаживаниями
     },
     onPoke: () => {
       const now = Date.now();
@@ -253,36 +283,60 @@ function llamaCard(p, kind, outfit, refs, rerender) {
     onSpit: () => { p.spits = (p.spits || 0) + 1; commit(); },
   });
   ll.setMood(mood());
-  ll.setOutfit(outfit ? outfit.emoji : null);
+  ll.setLook(p.look);
+  ll.setDirt((100 - p.clean) / 100);
 
   // встреча после долгой разлуки
   const now = Date.now();
   if (p.lastSeen && now - p.lastSeen > 3 * 60 * MIN && !ll.asleep) setTimeout(() => ll.cheer(p.food < 30 ? 'Я скучала… и голодная' : 'Ура, ты тут!'), 500);
   p.lastSeen = now;
 
-  const hint = (!tut.pet || !tut.fed)
-    ? h('div.pt-hint', !tut.pet ? 'погладь пальцем · тяни еду к ламе' : 'тяни еду к ламе')
-    : null;
+  const hint = (!tut.pet || !tut.fed || !tut.brush) ? h('div.pt-hint', 'гладь пальцем · тяни еду к ламе или в миску · расчёсывай 🪮') : null;
   const night = ll.asleep;
-  const tray = foodTray(p, ll, refs, () => { if (!tut.fed) { tut.fed = true; hint?.remove(); commit(); } });
+  const bowl = bowlEl(p);
+  const stage = h('div.pt-stage', ll.el, bowl.el);
+  const tray = careTray(p, ll, refs, bowl, learned);
 
   return h('div.pt-card.ll-card' + (night ? '.night' : ''),
     night ? h('div.pt-moon', '🌙') : null,
     h('div.pt-name', p.name),
     h('div.pt-chips', kindChip(p, kind, rerender), h('span.pt-chip', `ур. ${p.level}`)),
-    h('div.pt-stage', ll.el),
+    stage,
     tray,
     hint,
   );
 }
 
-/** Полка с едой под ламой: тянуть еду ко рту или просто тапнуть */
-function foodTray(p, ll, refs, onFed) {
+/** Миска: до 3 порций впрок. Лама ест из неё сама, когда проголодается */
+function bowlEl(p) {
+  const food = h('div.pt-bowl-food');
+  const el = h('div.pt-bowl', food);
+  el.insertAdjacentHTML('beforeend', `<svg viewBox="0 0 100 50"><path d="M6 14 L94 14 Q90 46 50 46 Q10 46 6 14 Z" fill="#ff5fa2" stroke="#111" stroke-width="5" stroke-linejoin="round"/>
+    <rect x="3" y="8" width="94" height="10" rx="5" fill="#c8ff2e" stroke="#111" stroke-width="5"/><path d="M30 30 L42 30 M54 30 L66 30" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".7"/></svg>`);
+  const fill = () => food.replaceChildren(...p.bowl.map((id, i) => h('span', { style: { '--i': i } }, getItem(id).emoji)));
+  fill();
+  return { el, fill };
+}
+
+/** Полка ухода: расчёска и еда. Еду тянуть ко рту (сразу съест) или в миску (впрок) */
+function careTray(p, ll, refs, bowl, learned) {
   const tray = h('div.pt-tray');
+  const setFood = () => { refs.food.textContent = p.food + '%'; };
+  const eatNow = (id) => {
+    const v = eatValue(id) || 4;
+    p.food = clamp(p.food + v * 4);
+    setFood();
+    ll.eat();
+    setTimeout(() => ll.setMood({ food: p.food, joy: p.joy, sleep: false }), 1400);
+    addPetXP(p, v);
+    commit();
+  };
   const fill = () => {
     const foods = Object.keys(state.items).filter((id) => eatValue(id) != null)
       .sort((a, b) => eatValue(b) - eatValue(a)).slice(0, 12);
-    tray.replaceChildren(...(foods.length
+    const brush = h('button.pt-food.pt-brush', h('span', '🪮'));
+    brush.addEventListener('pointerdown', (e) => drag(e, null, brush));
+    tray.replaceChildren(brush, ...(foods.length
       ? foods.map((id) => {
         const b = h('button.pt-food', h('span', getItem(id).emoji), h('small', '×' + state.items[id]));
         b.addEventListener('pointerdown', (e) => drag(e, id, b));
@@ -290,65 +344,167 @@ function foodTray(p, ll, refs, onFed) {
       })
       : [h('div.pt-tray-empty', '🍽️ еды нет — ищи в играх')]));
   };
-  const feed = (id) => {
-    if (p.food >= 100) { ll.refuse(isFem(p.name) ? 'Я сыта!' : 'Я сыт!'); return false; }
-    if (!removeItem(id)) return false;
-    const v = eatValue(id);
-    p.food = clamp(p.food + v * 4);
-    refs.food.textContent = p.food + '%';
-    ll.eat();
-    setTimeout(() => ll.setMood({ food: p.food, joy: p.joy, sleep: false }), 1400);
-    addPetXP(p, v);
-    commit();
-    onFed();
+  const feedFromBag = (id) => {
+    if (p.food >= 100) { ll.refuse(isFem(p.name) ? 'Я сыта!' : 'Я сыт!'); return; }
+    if (!removeItem(id)) return;
+    learned('fed');
+    eatNow(id);
     fill();
-    return true;
   };
+  const toBowl = (id) => {
+    if (p.bowl.length >= 3) { ll.say('Миска полна', 1200); return; }
+    if (!removeItem(id)) return;
+    learned('fed');
+    p.bowl.push(id);
+    commit();
+    bowl.fill();
+    fill();
+    if (p.food < 60) setTimeout(eatFromBowl, 700);
+  };
+  const flyGhost = (emoji, from, to, ms, done) => {
+    const g = h('div.pt-ghost', emoji);
+    g.style.left = from.x + 'px'; g.style.top = from.y + 'px';
+    document.body.append(g);
+    requestAnimationFrame(() => { g.style.transition = `left ${ms}ms ease-in-out, top ${ms}ms cubic-bezier(.3,-0.6,.7,1), transform ${ms}ms`; g.style.left = to.x + 'px'; g.style.top = to.y + 'px'; g.style.transform = 'translate(-50%,-50%) scale(.5)'; });
+    setTimeout(() => { g.remove(); done(); }, ms + 20);
+  };
+  function eatFromBowl() {
+    if (!bowl.el.isConnected || !p.bowl.length) return;
+    if (p.food >= 95) { ll.refuse('Не хочу'); return; }
+    const id = p.bowl.shift();
+    commit();
+    bowl.fill();
+    const r = bowl.el.getBoundingClientRect();
+    ll.want(true);
+    flyGhost(getItem(id).emoji, { x: r.left + r.width / 2, y: r.top + 10 }, ll.mouthClient(), 420, () => { ll.want(false); eatNow(id); });
+  }
+  bowl.el.addEventListener('click', () => {
+    if (p.bowl.length) eatFromBowl();
+    else { bowl.el.classList.remove('shake'); void bowl.el.offsetWidth; bowl.el.classList.add('shake'); ll.say('Миска пустая', 1200); }
+  });
+  const near = (x, y, el, d) => { const r = el.getBoundingClientRect(); return Math.hypot(x - (r.left + r.width / 2), y - (r.top + r.height / 2)) < d; };
+
   function drag(e, id, btn) {
-    const ghost = h('div.pt-ghost', getItem(id).emoji);
+    const isBrush = id == null;
+    const ghost = h('div.pt-ghost' + (isBrush ? '.brush' : ''), isBrush ? '🪮' : getItem(id).emoji);
     const r0 = btn.getBoundingClientRect();
     const x0 = e.clientX, y0 = e.clientY;
-    let moved = false, near = false;
+    let moved = false, atMouth = false, atBowl = false, portions = 0;
     const place = (x, y) => { ghost.style.left = x + 'px'; ghost.style.top = y + 'px'; };
     const onMove = (ev) => {
       if (!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 8) return;
       if (!moved) { moved = true; document.body.append(ghost); }
-      place(ev.clientX, ev.clientY - 30);
-      ll.lookAtClient(ev.clientX, ev.clientY - 30);
+      const x = ev.clientX, y = ev.clientY - 30;
+      place(x, y);
+      if (isBrush) {
+        const hit = ll.brushAt(x, y);
+        if (hit === 2) {
+          learned('brush');
+          const was = p.clean;
+          p.clean = clamp(p.clean + 6);
+          refs.clean.textContent = p.clean + '%';
+          ll.setDirt((100 - p.clean) / 100);
+          if (++portions <= 8) { p.joy = clamp(p.joy + 1); refs.joy.textContent = p.joy + '%'; }
+          commit();
+          if (was < 100 && p.clean >= 100) ll.cheer('Чистюля!');
+        }
+        return;
+      }
+      ll.lookAtClient(x, y);
       const m = ll.mouthClient();
-      const n = Math.hypot(ev.clientX - m.x, ev.clientY - 30 - m.y) < 90;
-      if (n !== near) { near = n; ll.want(n); }
+      const nm = Math.hypot(x - m.x, y - m.y) < 90;
+      if (nm !== atMouth) { atMouth = nm; ll.want(nm); }
+      const nb = near(x, y, bowl.el, 70);
+      if (nb !== atBowl) { atBowl = nb; bowl.el.classList.toggle('hot', nb); }
     };
-    const end = (ev) => {
+    const stop = () => {
       removeEventListener('pointermove', onMove);
       removeEventListener('pointerup', end);
       removeEventListener('pointercancel', cancel);
+      bowl.el.classList.remove('hot');
+    };
+    const end = () => {
+      stop();
+      if (isBrush) {
+        ghost.remove();
+        if (moved) ll.brushEnd(); else ll.say('Почеши меня 🪮', 1400);
+        return;
+      }
       if (!moved) { // тап: еда сама летит ко рту
-        const m = ll.mouthClient();
-        place(r0.left + r0.width / 2, r0.top + r0.height / 2);
-        document.body.append(ghost);
         ll.want(true);
-        requestAnimationFrame(() => { ghost.classList.add('fly'); place(m.x, m.y); });
-        setTimeout(() => { ghost.remove(); ll.want(false); feed(id); }, 380);
+        flyGhost(getItem(id).emoji, { x: r0.left + r0.width / 2, y: r0.top + r0.height / 2 }, ll.mouthClient(), 380, () => { ll.want(false); feedFromBag(id); });
         return;
       }
       ll.want(false);
-      if (near) { ghost.remove(); feed(id); }
-      else { ghost.classList.add('drop'); setTimeout(() => ghost.remove(), 250); }
-    };
-    const cancel = () => { // браузер забрал жест (прокрутка полки)
-      removeEventListener('pointermove', onMove);
-      removeEventListener('pointerup', end);
-      removeEventListener('pointercancel', cancel);
       ghost.remove();
-      ll.want(false);
+      if (atMouth) feedFromBag(id);
+      else if (atBowl) toBowl(id);
     };
+    const cancel = () => { stop(); ghost.remove(); ll.want(false); if (isBrush) ll.brushEnd(); };
     addEventListener('pointermove', onMove);
     addEventListener('pointerup', end);
     addEventListener('pointercancel', cancel);
   }
   fill();
   return tray;
+}
+
+/** Подогнать viewBox иконки вещи по её реальным границам */
+function fitIcon(svg) {
+  try {
+    const b = svg.getBBox();
+    if (!b.width) return;
+    const pad = Math.max(b.width, b.height) * 0.08;
+    svg.setAttribute('viewBox', `${b.x - pad} ${b.y - pad} ${b.width + pad * 2} ${b.height + pad * 2}`);
+  } catch { /* не в DOM */ }
+}
+
+// ---------- Гардероб ламы: каждая вещь покупается словом из букв ----------
+function wardrobeModal(p, rerender) {
+  p.look ||= { wool: 'cream' };
+  p.wardrobe ||= ['wool:cream'];
+  const before = JSON.stringify(p.look);
+  let slot = 'head';
+  const prev = createLlama({ still: true });
+  prev.setLook(p.look);
+  prev.setDirt(0);
+  const tabs = h('div.wd-tabs');
+  const grid = h('div.wd-grid');
+  const has = (w) => !w.word || p.wardrobe.includes(w.slot + ':' + w.id);
+  const wear = (w) => {
+    if (w.slot !== 'wool' && p.look[w.slot] === w.id) delete p.look[w.slot];
+    else p.look[w.slot] = w.id;
+    commit();
+    prev.setLook(p.look);
+    prev.cheer();
+    draw();
+  };
+  const draw = () => {
+    tabs.replaceChildren(...SLOTS.map((s) => h('button.wd-tab' + (s.id === slot ? '.on' : ''), { onclick: () => { slot = s.id; draw(); } }, s.name)));
+    grid.replaceChildren(...WARDROBE.filter((w) => w.slot === slot).map((w) => {
+      const own = has(w);
+      const on = p.look[w.slot] === w.id;
+      const pic = h('div.wd-pic');
+      if (w.slot === 'wool') pic.append(h('span.wd-swatch', { style: { background: WOOL[w.id][0], boxShadow: `inset -6px -8px 0 ${WOOL[w.id][1]}, 0 0 0 3px #111` } }));
+      else pic.innerHTML = itemPreview(w.slot, w.id);
+      return h('button.wd-item' + (on ? '.on' : '') + (own ? '' : '.lock'), {
+        onclick: () => {
+          if (own) { wear(w); return; }
+          spellModal({ word: w.word, title: w.name, icon: h('div.wd-big', pic.cloneNode(true)), sub: `Набери «${w.word}», чтобы получить`,
+            onDone: () => { p.wardrobe.push(w.slot + ':' + w.id); commit(); wear(w); } });
+        },
+      }, pic, h('span.wd-name', w.name), own ? (on ? h('span.wd-st', '✓ надето') : null) : wordTiles(w.word));
+    }));
+    requestAnimationFrame(() => grid.querySelectorAll('svg.ll-ico').forEach(fitIcon));
+  };
+  draw();
+  const m = modal([
+    h('div.wd-prev', prev.el),
+    tabs,
+    grid,
+    h('button.btn', { onclick: () => m.close() }, 'Готово'),
+  ], { onClose: () => { rerender(); if (JSON.stringify(p.look) !== before) toast('Обновка! ✨'); } });
+  m.el.classList.add('wd-box');
 }
 
 function tile(cls, icon, label, value, extra) {
@@ -564,6 +720,7 @@ function claim(p, frac, rerender) {
 
   p.food = clamp(p.food - Math.round(15 * Math.max(frac, 0.2)));
   p.joy = clamp(p.joy + Math.round(10 * Math.max(frac, 0.2)));
+  p.clean = clamp((p.clean ?? 100) - Math.round(35 * Math.max(frac, 0.2))); // с прогулки — в пятнах
   applyReward(reward); // внутри commit()
   addPetXP(p, def.xp * frac);
   commit();
@@ -575,6 +732,40 @@ function claim(p, frac, rerender) {
 
 // ---------- Стили ----------
 const CSS = `
+.pt-kind { position: relative; }
+.pt-price { display: inline-flex; gap: 2px; font-size: 12px; margin-top: 4px; }
+.pt-kind.on .pt-price .ltr { box-shadow: none; }
+.pt-kind-ok { font-weight: 900; color: #3fb950; font-size: 13px; margin-top: 2px; }
+.pt-mini { width: 150px; }
+.pt-mini .ll-wrap { width: 150px; }
+.pt-stage { position: relative; }
+.pt-bowl { position: absolute; left: 0; bottom: 4px; width: 78px; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform .15s; }
+.pt-bowl svg { display: block; width: 100%; }
+.pt-bowl.hot { transform: scale(1.18); }
+.pt-bowl.shake { animation: sp-shake .3s; }
+.pt-bowl-food { position: absolute; left: 0; right: 0; bottom: 18px; display: flex; justify-content: center; pointer-events: none; }
+.pt-bowl-food span { font-size: 24px; margin: 0 -5px; transform: translateY(calc(var(--i) * -3px)); }
+.pt-brush { background: var(--lime, #c8ff2e) !important; }
+.pt-ghost.brush { font-size: 54px; transform: translate(-50%, -50%) rotate(-30deg); }
+.wd-box { max-height: 92vh; overflow-y: auto; }
+.wd-box > * { flex-shrink: 0; }
+.wd-prev { width: 170px; margin: -6px auto 4px; }
+.wd-prev .ll-wrap { width: 170px; }
+.wd-tabs { display: flex; gap: 6px; overflow-x: auto; padding: 4px 2px 8px; scrollbar-width: none; }
+.wd-tab { flex: none; border: 0; border-radius: 99px; padding: 8px 14px; font-weight: 900; font-size: 14px; background: var(--card-soft, #eee); color: var(--ink); cursor: pointer; }
+.wd-tab.on { background: var(--ink); color: var(--lime, #c8ff2e); }
+.wd-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+.wd-item { border: 0; border-radius: 20px; background: var(--card-soft, #f2f2f2); padding: 8px 4px 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; color: var(--ink); }
+.wd-item.on { background: var(--lime, #c8ff2e); box-shadow: inset 0 0 0 3px var(--ink); }
+.wd-item.lock .wd-pic { opacity: .55; }
+.wd-pic { width: 64px; height: 52px; display: grid; place-items: center; }
+.wd-swatch { width: 40px; height: 40px; border-radius: 50%; display: block; }
+.wd-name { font-weight: 900; font-size: 12px; }
+.wd-st { font-weight: 900; font-size: 11px; }
+.wd-item .pt-price { flex-wrap: wrap; justify-content: center; font-size: 9px; gap: 1px; }
+.wd-big { width: 150px; height: 110px; display: grid; place-items: center; margin-bottom: 12px; }
+.wd-big .wd-pic { width: 150px; height: 110px; }
+.wd-big .wd-swatch { width: 90px; height: 90px; }
 .ll-card { cursor: default; min-height: 0; padding-bottom: 12px; }
 .ll-card:active { transform: none; }
 .ll-card.night { background: #1d1b3a; color: #fff; box-shadow: 0 6px 0 #000;
