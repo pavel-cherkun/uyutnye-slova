@@ -9,15 +9,16 @@ const INK = '#111';
 let uid = 0;
 
 // ---------- Шерсть ----------
+// [светлая шерсть, тень, мордочка]
 export const WOOL = {
-  cream: ['#fff6e6', '#e8d3b4'],
-  snow: ['#ffffff', '#d9dee6'],
-  caramel: ['#f2c79a', '#d29a68'],
-  rose: ['#ffd0e0', '#eba1bd'],
-  ash: ['#e6e2dc', '#b9b3aa'],
-  mint: ['#d4f5e2', '#9ed6b8'],
-  lavender: ['#e6dbff', '#b8a5ee'],
-  choco: ['#a9714c', '#7a4e33'],
+  cream: ['#fff6e6', '#e6cda8', '#f6d2ad'],
+  snow: ['#ffffff', '#d5dbe4', '#f1e6e0'],
+  caramel: ['#f4c896', '#cf955f', '#fbe1c2'],
+  rose: ['#ffd3e2', '#e99fbb', '#fff0f4'],
+  ash: ['#e8e4de', '#b5afa6', '#cfc8bf'],
+  mint: ['#d6f5e3', '#98d3b3', '#f2fff7'],
+  lavender: ['#e8ddff', '#b4a1ec', '#f7f2ff'],
+  choco: ['#ad754e', '#7a4c30', '#e3b98f'],
 };
 
 // ---------- Гардероб: что есть и какое слово нужно набрать, чтобы получить ----------
@@ -75,66 +76,161 @@ export const SLOTS = [
 ];
 
 // ---------- Рисунок ----------
-// пушистая часть: чёрные круги побольше (контур), круги тени, сверху сдвинутые светлые круги (блик)
-const blob = (cs) =>
-  cs.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r + 6}" fill="${INK}"/>`).join('') +
-  cs.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" class="ws"/>`).join('') +
-  cs.filter(([, , r]) => r > 8).map(([x, y, r]) => `<circle cx="${x - 3}" cy="${y - 5}" r="${r - 6}" class="wm"/>`).join('');
+// Шерсть рисуется по силуэту: точки силуэта → гладкая кривая → остроконечные пряди с наклоном.
+// Светотень — та же прядь, сдвинутая к свету (сверху-слева) и обрезанная силуэтом: тень ложится по форме прядей.
 
-const BODY = [
-  [116, 175, 30], [114, 148, 28], [104, 196, 26], [98, 215, 22], // шея и грудь
-  [150, 215, 40], [192, 210, 42], [230, 204, 32], [124, 230, 30], [160, 246, 30], [206, 246, 30], [242, 228, 24], [176, 186, 30], [216, 184, 26],
-];
-const HEAD = [[114, 86, 42], [80, 98, 14], [150, 96, 13], [96, 118, 14], [132, 116, 14]];
-const TUFT = [[98, 48, 13], [114, 42, 15], [130, 46, 13], [142, 54, 9], [86, 56, 9], [106, 56, 10], [124, 57, 10]];
-const TAIL = [[262, 176, 15], [276, 165, 11], [272, 190, 10]];
+function prng(seed) { let x = seed % 2147483647 || 1; return () => (x = (x * 16807) % 2147483647) / 2147483647; }
+const f1 = (v) => Math.round(v * 10) / 10;
+
+/** Плавная замкнутая кривая через точки (Catmull-Rom), равномерно пересэмплированная с шагом step */
+function resample(pts, step) {
+  const dense = [];
+  const n = pts.length;
+  for (let i = 0; i < n; i++) {
+    const p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+    for (let k = 0; k < 12; k++) {
+      const t = k / 12, t2 = t * t, t3 = t2 * t;
+      dense.push([0, 1].map((j) => 0.5 * ((2 * p1[j]) + (-p0[j] + p2[j]) * t + (2 * p0[j] - 5 * p1[j] + 4 * p2[j] - p3[j]) * t2 + (-p0[j] + 3 * p1[j] - 3 * p2[j] + p3[j]) * t3)));
+    }
+  }
+  let total = 0;
+  const seg = dense.map((p, i) => { const q = dense[(i + 1) % dense.length]; const l = Math.hypot(q[0] - p[0], q[1] - p[1]); total += l; return l; });
+  const cnt = Math.max(6, Math.round(total / step)), d = total / cnt, out = [];
+  let acc = 0, i = 0;
+  for (let k = 0; k < cnt; k++) {
+    const target = k * d;
+    while (acc + seg[i] < target) { acc += seg[i]; i = (i + 1) % dense.length; }
+    const t = (target - acc) / (seg[i] || 1), p = dense[i], q = dense[(i + 1) % dense.length];
+    out.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]);
+  }
+  return out;
+}
+const areaSign = (pts) => (pts.reduce((a, p, i) => { const q = pts[(i + 1) % pts.length]; return a + p[0] * q[1] - q[0] * p[1]; }, 0) > 0 ? 1 : -1);
+
+/** Силуэт с прядями. depth — длина пряди, lean — наклон (0 — симметрично), smooth — участки без прядей (индексы точек силуэта). */
+function furPath(pts, { step = 15, depth = 8, lean = 0.3, seed = 1, jitter = 0.4 } = {}) {
+  const s = resample(pts, step), sg = areaSign(s), r = prng(seed);
+  let d = `M${f1(s[0][0])} ${f1(s[0][1])}`;
+  for (let i = 0; i < s.length; i++) {
+    const a = s[i], b = s[(i + 1) % s.length];
+    const tx = b[0] - a[0], ty = b[1] - a[1], L = Math.hypot(tx, ty) || 1;
+    const nx = (sg * ty) / L, ny = (-sg * tx) / L;
+    const dep = depth * (1 - jitter + r() * jitter * 2);
+    const u = 0.55 + lean * 0.35;
+    const tip = [a[0] + tx * u + nx * dep, a[1] + ty * u + ny * dep];
+    const c1 = [a[0] + tx * 0.1 + nx * dep * 0.85, a[1] + ty * 0.1 + ny * dep * 0.85];
+    const c2 = [tip[0] - tx * 0.22, tip[1] - ty * 0.22];
+    const c3 = [b[0] - tx * 0.18 + nx * dep * 0.1, b[1] - ty * 0.18 + ny * dep * 0.1];
+    d += `C${f1(c1[0])} ${f1(c1[1])} ${f1(c2[0])} ${f1(c2[1])} ${f1(tip[0])} ${f1(tip[1])}Q${f1(c3[0])} ${f1(c3[1])} ${f1(b[0])} ${f1(b[1])}`;
+  }
+  return d + 'Z';
+}
+const ellipsePts = (cx, cy, rx, ry, n = 16, rot = 0) => Array.from({ length: n }, (_, i) => {
+  const t = (i / n) * Math.PI * 2, c = Math.cos(rot), sn = Math.sin(rot), x = Math.cos(t) * rx, y = Math.sin(t) * ry;
+  return [cx + x * c - y * sn, cy + x * sn + y * c];
+});
+const inside = (pts, x, y) => { let c = false; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) { const [xi, yi] = pts[i], [xj, yj] = pts[j]; if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c; } return c; };
+/** Штрихи фактуры шерсти внутри силуэта */
+function furStrokes(pts, n, seed, box) {
+  const r = prng(seed), out = [];
+  let guard = 0;
+  while (out.length < n && guard++ < n * 30) {
+    const x = box[0] + r() * (box[2] - box[0]), y = box[1] + r() * (box[3] - box[1]);
+    if (!inside(pts, x, y)) continue;
+    const w = 5 + r() * 4, h = 3 + r() * 3, k = (r() - 0.5) * 4;
+    out.push(`M${f1(x - w)} ${f1(y + h)}Q${f1(x + k)} ${f1(y - h)} ${f1(x + w)} ${f1(y + h * 0.6)}`);
+  }
+  return out.join('');
+}
+
+/**
+ * Пушистая часть с контуром и светотенью. id — для clipPath; light — сдвиг блика.
+ * Слои: контур (толстая обводка) → тень (весь силуэт) → светлая часть (сдвинутая к свету, обрезанная) → блик.
+ */
+function furPart(id, pts, opts = {}, { stroke = 6, light = [-4, -7], strokes = 0, box = null, seed = 3, inner = '' } = {}) {
+  const d = furPath(pts, opts);
+  const cx = pts.reduce((a, p) => a + p[0], 0) / pts.length, cy = pts.reduce((a, p) => a + p[1], 0) / pts.length;
+  return `<clipPath id="${id}"><path d="${d}"/></clipPath>
+    <path d="${d}" class="ws" stroke="${INK}" stroke-width="${stroke}" stroke-linejoin="round"/>
+    <g clip-path="url(#${id})">
+      <path d="${d}" class="wm" transform="translate(${light[0]} ${light[1]}) translate(${f1(cx)} ${f1(cy)}) scale(.97) translate(${f1(-cx)} ${f1(-cy)})"/>
+      <path d="${d}" fill="#fff" opacity=".42" transform="translate(${light[0] * 2.4} ${light[1] * 2.4}) translate(${f1(cx)} ${f1(cy)}) scale(.86) translate(${f1(-cx)} ${f1(-cy)})"/>
+      ${inner}
+      ${strokes && box ? `<path d="${furStrokes(pts, strokes, seed, box)}" fill="none" class="wsl" stroke-width="2.6" stroke-linecap="round"/>` : ''}
+    </g>`;
+}
+
+// силуэт тела вместе с шеей и грудкой
+const BODY_PTS = [[94, 118], [90, 150], [80, 180], [82, 208], [96, 236], [122, 256], [160, 266], [200, 268], [236, 262], [262, 246], [276, 220], [272, 192], [252, 175], [214, 167], [178, 169], [156, 163], [146, 142], [142, 118]];
+const HEAD_PTS = ellipsePts(114, 84, 46, 42, 18);
+const TUFT_PTS = [[80, 60], [86, 42], [100, 30], [118, 27], [136, 33], [148, 46], [150, 60], [138, 64], [124, 58], [112, 66], [100, 62], [90, 68]];
+const TAIL_PTS = ellipsePts(268, 180, 15, 21, 12, -0.5);
 
 const S = `stroke="${INK}" stroke-linejoin="round" stroke-linecap="round"`;
-const leg = (cx, top, cls) =>
-  `<rect x="${cx - 13}" y="${top}" width="26" height="${296 - top}" rx="11" class="${cls}" ${S} stroke-width="5"/>` +
-  `<path d="M${cx - 14} 292 L${cx + 14} 292 L${cx + 9} 311 L${cx - 9} 311 Z" fill="#8a5a3a" ${S} stroke-width="5"/>`;
+function leg(cx, top, cls, n, sock) {
+  return `<path d="M${cx - 12} ${top} L${cx + 12} ${top} L${cx + 9} 293 L${cx - 9} 293 Z" class="${cls}" ${S} stroke-width="5"/>
+    <path d="M${cx - 11} 290 L${cx + 11} 290 L${cx + 8} 309 Q${cx} 313 ${cx - 8} 309 Z" fill="#6b4428" ${S} stroke-width="4.5"/>
+    <path d="M${cx} 295 L${cx} 308" stroke="#3a2416" stroke-width="2.5" stroke-linecap="round"/>
+    ${sock ? `<path d="M${cx + 4} ${top + 10} L${cx + 6} 288" stroke="rgba(90,60,30,.18)" stroke-width="5" stroke-linecap="round"/>` : ''}`;
+}
 
-const eye = (side, cx, cy, r, clip) => `<g class="ll-eye ll-eye-${side}">
-  <g class="ll-eo"><circle cx="${cx}" cy="${cy}" r="${r}" fill="#fff" ${S} stroke-width="4.5"/>
-    <clipPath id="${clip}"><circle cx="${cx}" cy="${cy}" r="${r - 2}"/></clipPath>
+const eye = (side, cx, cy, r, clip, lash) => `<g class="ll-eye ll-eye-${side}">
+  <g class="ll-eo"><circle cx="${cx}" cy="${cy}" r="${r}" fill="#fff" ${S} stroke-width="4"/>
+    <clipPath id="${clip}"><circle cx="${cx}" cy="${cy}" r="${r - 1.5}"/></clipPath>
     <g clip-path="url(#${clip})">
-      <g class="ll-pupil"><circle cx="${cx}" cy="${cy}" r="${r * 0.52}" fill="${INK}"/><circle cx="${cx - 3}" cy="${cy - 3.5}" r="${r * 0.17}" fill="#fff"/></g>
-      <rect class="ll-lid wm" x="${cx - r - 3}" y="${cy - r - 3}" width="${r * 2 + 6}" height="0" ${S} stroke-width="3.5"/>
-    </g></g>
+      <g class="ll-pupil">
+        <circle cx="${cx}" cy="${cy + 1}" r="${f1(r * 0.66)}" fill="#3b2418"/>
+        <circle cx="${cx}" cy="${cy + 1}" r="${f1(r * 0.4)}" fill="${INK}"/>
+        <circle cx="${f1(cx - r * 0.28)}" cy="${f1(cy - r * 0.28)}" r="${f1(r * 0.22)}" fill="#fff"/>
+        <circle cx="${f1(cx + r * 0.25)}" cy="${f1(cy + r * 0.32)}" r="${f1(r * 0.1)}" fill="#fff"/>
+      </g>
+      <path d="M${cx - r} ${f1(cy + r * 0.55)} Q${cx} ${f1(cy + r * 1.1)} ${cx + r} ${f1(cy + r * 0.55)} L${cx + r} ${cy + r} L${cx - r} ${cy + r} Z" fill="rgba(0,0,0,.08)"/>
+      <rect class="ll-lid ws" x="${cx - r - 3}" y="${cy - r - 3}" width="${r * 2 + 6}" height="0" ${S} stroke-width="3.5"/>
+    </g>
+    <path d="M${f1(cx - r * 0.95)} ${f1(cy - r * 0.35)} Q${cx} ${f1(cy - r * 1.35)} ${f1(cx + r * 0.95)} ${f1(cy - r * 0.35)}" fill="none" ${S} stroke-width="5"/>
+    ${lash > 0 ? `<path d="M${f1(cx + r * 0.8)} ${f1(cy - r * 0.62)} l6 -5 M${f1(cx + r * 0.95)} ${f1(cy - r * 0.25)} l7 -2" fill="none" ${S} stroke-width="3.5"/>`
+      : `<path d="M${f1(cx - r * 0.8)} ${f1(cy - r * 0.62)} l-6 -5 M${f1(cx - r * 0.95)} ${f1(cy - r * 0.25)} l-7 -2" fill="none" ${S} stroke-width="3.5"/>`}
+  </g>
   <path class="ll-eh" d="M${cx - r + 3} ${cy + 3} Q${cx} ${cy - r} ${cx + r - 3} ${cy + 3}"/>
   <path class="ll-es" d="M${cx - r + 3} ${cy - 2} Q${cx} ${cy + r * 0.7} ${cx + r - 3} ${cy - 2}"/></g>`;
 
-const DIRT = [[170, 236, 12, 7], [210, 218, 9, 6], [140, 252, 8, 5], [236, 198, 7, 4], [120, 204, 6, 4], [118, 286, 7, 5], [212, 288, 7, 5], [192, 248, 6, 4], [86, 104, 5, 3]];
+const DIRT = [[170, 236, 12, 7], [210, 218, 9, 6], [140, 252, 8, 5], [236, 198, 7, 4], [104, 204, 6, 4], [116, 282, 6, 4], [218, 284, 6, 4], [192, 248, 6, 4], [82, 104, 5, 3]];
 
 function svgMarkup(n) {
+  const id = (k) => `ll${n}${k}`;
   return `<svg class="ll" viewBox="0 -14 300 334" data-eyes="open">
-<ellipse cx="165" cy="312" rx="112" ry="10" fill="rgba(0,0,0,.14)"/>
+<ellipse cx="172" cy="311" rx="110" ry="9" fill="rgba(0,0,0,.16)"/>
 <g class="ll-all">
-  ${leg(144, 232, 'ws')}${leg(240, 228, 'ws')}
-  <g class="ll-tail">${blob(TAIL)}</g>
-  ${leg(118, 236, 'wm')}${leg(212, 236, 'wm')}
-  <g class="ll-body">${blob(BODY)}
-    <path d="M150 232 q7 7 14 0 M192 240 q7 7 14 0 M228 222 q6 6 12 0 M110 216 q6 6 12 0 M176 206 q6 6 12 0" fill="none" class="wsl" stroke-width="3.5" stroke-linecap="round"/>
+  ${leg(146, 244, 'ws', n, false)}${leg(246, 240, 'ws', n, false)}
+  <g class="ll-tail">${furPart(id('t'), TAIL_PTS, { step: 11, depth: 7, lean: 0.5, seed: 7 }, { stroke: 5.5, light: [-3, -5] })}</g>
+  ${leg(116, 248, 'wm', n, true)}${leg(218, 252, 'wm', n, true)}
+  <g class="ll-body">${furPart(id('b'), BODY_PTS, { step: 17, depth: 9, lean: 0.35, seed: 11 }, { stroke: 6.5, light: [-5, -9], strokes: 16, box: [90, 150, 270, 262], seed: 5,
+    inner: `<ellipse cx="118" cy="132" rx="34" ry="14" fill="rgba(90,55,25,.16)"/><ellipse cx="186" cy="274" rx="100" ry="18" fill="rgba(90,55,25,.14)"/>
+      <path d="M170 182 q8 -5 16 -2 M200 178 q7 -4 14 -1 M104 150 q4 -6 10 -7" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" opacity=".85"/>` })}
+    <path d="M100 206 Q112 226 134 236" fill="none" class="wsl" stroke-width="3" stroke-linecap="round" opacity=".9"/>
   </g>
   <g class="ll-dirt">${DIRT.map(([x, y, rx, ry]) => `<ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" fill="#8a5a32" opacity="0"/>`).join('')}</g>
   <g class="ll-slot-back"></g>
   <g class="ll-slot-neck"></g>
   <g class="ll-head">
-    <g class="ll-ear-r"><g transform="translate(140 56) rotate(18)"><path d="M-12 0 C-17 -24 -10 -50 0 -62 C10 -50 17 -24 12 0 Z" class="ws" ${S} stroke-width="5"/>
-      <path d="M-5 -8 C-8 -26 -5 -42 0 -50 C5 -42 8 -26 5 -8 Z" fill="#f59ab4"/></g></g>
-    <g class="ll-ear-l"><g transform="translate(86 60) rotate(-20)"><path d="M-12 0 C-17 -24 -10 -50 0 -62 C10 -50 17 -24 12 0 Z" class="wm" ${S} stroke-width="5"/>
-      <path d="M-5 -8 C-8 -26 -5 -42 0 -50 C5 -42 8 -26 5 -8 Z" fill="#ffb3c7"/></g></g>
-    ${blob(HEAD)}
-    <ellipse class="ll-cheek" cx="78" cy="108" rx="8" ry="5" fill="#ff8fb0"/><ellipse class="ll-cheek" cx="150" cy="106" rx="7" ry="5" fill="#ff8fb0"/>
-    ${eye('l', 94, 86, 17, 'llc' + n + 'a')}${eye('r', 136, 84, 15, 'llc' + n + 'b')}
-    <ellipse cx="112" cy="117" rx="25" ry="19" class="wm" ${S} stroke-width="4.5"/>
+    <g class="ll-ear-r"><g transform="translate(140 56) rotate(20)"><path d="M-12 2 C-19 -22 -12 -52 2 -66 C12 -50 17 -22 12 2 Z" class="ws" ${S} stroke-width="5"/>
+      <path d="M-5 -6 C-9 -26 -5 -44 2 -54 C7 -42 9 -24 5 -6 Z" fill="#e99ab0"/></g></g>
+    <g class="ll-ear-l"><g transform="translate(86 60) rotate(-22)"><path d="M-12 2 C-17 -22 -12 -52 -2 -66 C12 -52 19 -22 12 2 Z" class="wm" ${S} stroke-width="5"/>
+      <path d="M-5 -6 C-7 -24 -5 -42 -2 -54 C5 -44 9 -26 5 -6 Z" fill="#ffb3c7"/><path d="M-3 -12 C-4 -26 -3 -38 -1 -46" fill="none" stroke="#ff8fb0" stroke-width="2.5" stroke-linecap="round"/></g></g>
+    ${furPart(id('h'), HEAD_PTS, { step: 14, depth: 6, lean: 0.25, seed: 23 }, { stroke: 6, light: [-4, -6], inner: `<ellipse cx="146" cy="110" rx="18" ry="22" fill="rgba(90,55,25,.1)"/>` })}
+    <ellipse class="ll-cheek" cx="76" cy="106" rx="9" ry="5.5" fill="#ff8fb0"/><ellipse class="ll-cheek" cx="152" cy="104" rx="8" ry="5" fill="#ff8fb0"/>
+    ${eye('l', 94, 86, 17, id('ea'), -1)}${eye('r', 136, 84, 15, id('eb'), 1)}
+    <path d="M86 112 C86 98 138 98 138 112 C140 126 128 136 112 136 C96 136 84 126 86 112 Z" class="wf" ${S} stroke-width="4.5"/>
+    <path d="M92 112 C94 104 108 102 112 104" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="3.5" stroke-linecap="round"/>
     <path d="M101 106 Q112 100 123 106 Q118 114 112 113 Q106 114 101 106 Z" fill="${INK}"/>
+    <ellipse cx="106" cy="105.5" rx="2.2" ry="1.2" fill="#555"/>
     <path d="M112 112 L112 121" fill="none" ${S} stroke-width="3.5"/>
     <path class="ll-mouth" d="" fill="none" ${S} stroke-width="4"/>
     <g class="ll-open"><path d="M96 124 Q112 166 128 124 Z" fill="${INK}" ${S} stroke-width="3"/>
       <ellipse cx="112" cy="140" rx="8" ry="5.5" fill="#ff7f9e"/>
       <rect x="104" y="123" width="7.5" height="8" rx="1.5" fill="#fff" ${S} stroke-width="2"/><rect x="112.5" y="123" width="7.5" height="8" rx="1.5" fill="#fff" ${S} stroke-width="2"/></g>
-    <g class="ll-tuft">${blob(TUFT)}</g>
+    <g class="ll-tuft">${furPart(id('f'), TUFT_PTS, { step: 11, depth: 6, lean: -0.45, seed: 31 }, { stroke: 5.5, light: [-3, -5],
+      inner: `<path d="M98 40 q6 -6 13 -6 M118 36 q6 -2 11 1" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".9"/>` })}</g>
     <g class="ll-brows"><path class="ll-bl" d="" fill="none" ${S} stroke-width="5"/><path class="ll-br" d="" fill="none" ${S} stroke-width="5"/></g>
     <g class="ll-slot-eyes"></g>
     <g class="ll-slot-head"></g>
@@ -572,9 +668,10 @@ export function createLlama({ onPet, onPoke, onWake, onSpit, still = false } = {
     bump() { if (asleep) { asleep = false; groggyUntil = 0; refreshFace(); } hopV = -8; squash.v -= 0.08; tilt.v -= 4; sfx('boop'); setMode('joy', 500); },
     /** Наряд: { wool, head, eyes, neck, back } */
     setLook(lk = {}) {
-      const [m, s] = WOOL[lk.wool] || WOOL.cream;
+      const [m, s, f] = WOOL[lk.wool] || WOOL.cream;
       svg.style.setProperty('--wm', m);
       svg.style.setProperty('--ws', s);
+      svg.style.setProperty('--wf', f);
       for (const slot of ['head', 'eyes', 'neck', 'back']) {
         const fn = lk[slot] && ITEM_SVG[slot][lk[slot]];
         P.slot[slot].innerHTML = fn ? fn(n) : '';
@@ -633,9 +730,10 @@ const CSS = `
 .ll-wrap { position: relative; width: min(100%, 300px); margin: 0 auto; touch-action: none; -webkit-user-select: none; user-select: none; }
 .ll-wrap.still { touch-action: auto; pointer-events: none; }
 .ll-wrap svg { display: block; width: 100%; height: auto; overflow: visible; cursor: grab; -webkit-tap-highlight-color: transparent; }
-.ll { --wm: #fff6e6; --ws: #e8d3b4; }
+.ll { --wm: #fff6e6; --ws: #e8d3b4; --wf: #f6d2ad; }
 .ll .wm { fill: var(--wm); }
 .ll .ws { fill: var(--ws); }
+.ll .wf { fill: var(--wf); }
 .ll .wsl { stroke: var(--ws); }
 .ll-eh, .ll-es { display: none; fill: none; stroke: #111; stroke-width: 5; stroke-linecap: round; }
 .ll[data-eyes="happy"] .ll-eo, .ll[data-eyes="sleep"] .ll-eo { display: none; }
