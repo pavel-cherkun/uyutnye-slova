@@ -7,8 +7,10 @@ import { state, commit, removeItem, applyReward } from '../state.js';
 import { ITEMS, getItem, CATEGORIES, eatValue } from '../data/items.js';
 import { gainXP, chestReward } from '../progression.js';
 import { randomLetter } from '../data/letters.js';
+import { createLlama } from '../ui/llama.js';
 
 const KINDS = [
+  { kind: 'llama', emoji: '🦙', name: 'Лама' },
   { kind: 'cat', emoji: '🐈', name: 'Кот' },
   { kind: 'dog', emoji: '🐕', name: 'Пёс' },
   { kind: 'hamster', emoji: '🐹', name: 'Хомяк' },
@@ -27,8 +29,9 @@ const WALKS = [
 ];
 
 let timer = null;         // интервал таймера прогулки (только пока экран открыт)
-let pickedKind = 'dog';   // выбор на экране заведения питомца
+let pickedKind = 'llama';   // выбор на экране заведения питомца
 let lastPet = 0;          // анти-спам поглаживания
+let wokeAt = 0;           // когда разбудили ночью (ещё 10 минут не спит)
 
 const clamp = (v) => Math.max(0, Math.min(100, Math.round(v)));
 const needXP = (lvl) => 50 * lvl;
@@ -129,42 +132,30 @@ function adoptView(rerender) {
 function homeView(p, rerender, nav) {
   const kind = KINDS.find((k) => k.kind === p.kind) || KINDS[0];
   const outfit = p.outfit && state.items[p.outfit] ? getItem(p.outfit) : null;
-  const emo = h('div.pt-emoji', p.emoji);
-  const card = h('div.pt-card', { role: 'button',
-    onclick: (e) => {
-      const now = Date.now();
-      emo.classList.remove('boing'); void emo.offsetWidth; emo.classList.add('boing');
-      if (now - lastPet < 2000) return;
-      lastPet = now;
-      p.joy = clamp(p.joy + 3);
-      commit();
-      floatText('❤️ +3', e.clientX, e.clientY - 20);
-      joyEl.textContent = p.joy + '%';
-    },
-  },
-    h('div.pt-name', p.name),
-    h('div.pt-pet', outfit ? h('div.pt-outfit', outfit.emoji) : null, emo),
-    h('div.pt-chips',
-      h('span.pt-chip.dark', kind.emoji + '\u00a0' + kind.name),
-      h('span.pt-chip', `ур. ${p.level}`),
-      h('span.pt-chip', p.food < 30 ? '🍖\u00a0голоден' : p.joy < 30 ? '😿\u00a0скучает' : '🏠\u00a0дома'),
-    ),
-    h('div.pt-hint', 'тапни — погладить'),
-  );
+  const refs = { food: h('b', p.food + '%'), joy: h('b', p.joy + '%') };
+  const isLlama = p.kind === 'llama';
+  const card = isLlama ? llamaCard(p, kind, outfit, refs, rerender) : emojiCard(p, kind, outfit, refs, rerender);
 
-  const joyEl = h('b', p.joy + '%');
   const xpPct = Math.round((p.xp / needXP(p.level)) * 100);
   const stats = h('div.pt-stats',
-    tile('white', '🍖', 'Сытость', h('b', p.food + '%'), bar(p.food)),
-    tile('gray', '❤️', 'Радость', joyEl, bar(p.joy)),
+    tile('white', '🍖', 'Сытость', refs.food, bar(p.food)),
+    tile('gray', '❤️', 'Радость', refs.joy, bar(p.joy)),
     tile('gray', '⭐', 'Уровень', h('b', String(p.level)), bar(xpPct)),
     tile('white', '🦮', 'Прогулок', h('b', String(p.walks || 0))),
     tile('white wide', '📍', 'Пройдено', h('b', ((p.meters || 0) / 1000).toFixed(1).replace('.', ',') + ' км')),
   );
 
+  // одна подсказка о новом звере для тех, кто завёл питомца раньше
+  let offer = null;
+  if (!isLlama && !state.progress.llamaOffer) {
+    offer = h('button.pt-notice.pt-offer', { onclick: () => { state.progress.llamaOffer = true; commit(); kindModal(p, rerender); } },
+      h('span.pt-ava', '🦙'), h('div', h('b', 'Появилась лама!'), h('small', 'Сменить питомца — имя и уровень останутся')));
+  }
+
   const hungry = p.food < 30;
   return h('div.pt-stack',
-    hungry ? notice(p, `${p.name} ${isFem(p.name) ? 'голодна' : 'голоден'}`, 'Покорми из сумки') : null,
+    offer,
+    hungry && !isLlama ? notice(p, `${p.name} ${isFem(p.name) ? 'голодна' : 'голоден'}`, 'Покорми из сумки') : null,
     card,
     h('div.pt-acts',
       roundBtn('🍖', 'Покормить', () => feedModal(p, rerender, nav)),
@@ -185,6 +176,179 @@ function homeView(p, rerender, nav) {
     })),
     stats,
   );
+}
+
+function statusChip(p) {
+  return h('span.pt-chip', p.food < 30 ? '🍖 голоден' : p.joy < 30 ? '😿 скучает' : '🏠 дома');
+}
+
+/** Чип вида — по тапу можно сменить зверя (имя, уровень и шкалы остаются) */
+function kindChip(p, kind, rerender) {
+  return h('button.pt-chip.dark', { onclick: (e) => { e.stopPropagation(); kindModal(p, rerender); } }, kind.emoji + ' ' + kind.name + ' ↻');
+}
+
+function kindModal(p, rerender) {
+  let m;
+  m = modal([
+    h('div.modal-title', 'Кто это?'),
+    h('div.pt-m-sub', 'Имя и уровень останутся'),
+    h('div.pt-kinds', KINDS.map((k) => h('button.pt-kind' + (k.kind === p.kind ? '.on' : ''), {
+      onclick: () => { p.kind = k.kind; p.emoji = k.emoji; commit(); m.close(); },
+    }, h('span.pt-kind-e', k.emoji), h('span.pt-kind-n', k.name)))),
+    h('button.btn.btn-ghost', { onclick: () => m.close() }, 'Готово'),
+  ], { onClose: rerender });
+}
+
+// Обычный питомец — эмодзи, тап — погладить
+function emojiCard(p, kind, outfit, refs, rerender) {
+  const emo = h('div.pt-emoji', p.emoji);
+  return h('div.pt-card', { role: 'button',
+    onclick: (e) => {
+      const now = Date.now();
+      emo.classList.remove('boing'); void emo.offsetWidth; emo.classList.add('boing');
+      if (now - lastPet < 2000) return;
+      lastPet = now;
+      p.joy = clamp(p.joy + 3);
+      commit();
+      floatText('❤️ +3', e.clientX, e.clientY - 20);
+      refs.joy.textContent = p.joy + '%';
+    },
+  },
+    h('div.pt-name', p.name),
+    h('div.pt-pet', outfit ? h('div.pt-outfit', outfit.emoji) : null, emo),
+    h('div.pt-chips', kindChip(p, kind, rerender), h('span.pt-chip', `ур. ${p.level}`), statusChip(p)),
+    h('div.pt-hint', 'тапни — погладить'),
+  );
+}
+
+// ---------- Живая лама ----------
+const isNight = () => { const hr = new Date().getHours(); return hr >= 23 || hr < 7; };
+
+function llamaCard(p, kind, outfit, refs, rerender) {
+  const tut = (p.tut ||= {});
+  let petGain = 0;
+  const addJoy = (n) => {
+    p.joy = clamp(p.joy + n);
+    refs.joy.textContent = p.joy + '%';
+    ll.setMood(mood());
+    commit();
+  };
+  const mood = () => ({ food: p.food, joy: p.joy, sleep: isNight() && Date.now() - wokeAt > 10 * MIN });
+  const ll = createLlama({
+    onPet: () => {
+      if (!tut.pet) { tut.pet = true; hint.remove(); commit(); }
+      const now = Date.now();
+      if (now - lastPet < 1200) return;
+      lastPet = now;
+      petGain++;
+      if (petGain <= 15) addJoy(2); // за один заход — до +30 радости поглаживаниями
+    },
+    onPoke: () => {
+      const now = Date.now();
+      if (now - lastPet < 2000) return;
+      lastPet = now;
+      addJoy(1);
+    },
+    onWake: () => { wokeAt = Date.now(); },
+    onSpit: () => { p.spits = (p.spits || 0) + 1; commit(); },
+  });
+  ll.setMood(mood());
+  ll.setOutfit(outfit ? outfit.emoji : null);
+
+  // встреча после долгой разлуки
+  const now = Date.now();
+  if (p.lastSeen && now - p.lastSeen > 3 * 60 * MIN && !ll.asleep) setTimeout(() => ll.cheer(p.food < 30 ? 'Я скучала… и голодная' : 'Ура, ты тут!'), 500);
+  p.lastSeen = now;
+
+  const hint = (!tut.pet || !tut.fed)
+    ? h('div.pt-hint', !tut.pet ? 'погладь пальцем · тяни еду к ламе' : 'тяни еду к ламе')
+    : null;
+  const night = ll.asleep;
+  const tray = foodTray(p, ll, refs, () => { if (!tut.fed) { tut.fed = true; hint?.remove(); commit(); } });
+
+  return h('div.pt-card.ll-card' + (night ? '.night' : ''),
+    night ? h('div.pt-moon', '🌙') : null,
+    h('div.pt-name', p.name),
+    h('div.pt-chips', kindChip(p, kind, rerender), h('span.pt-chip', `ур. ${p.level}`)),
+    h('div.pt-stage', ll.el),
+    tray,
+    hint,
+  );
+}
+
+/** Полка с едой под ламой: тянуть еду ко рту или просто тапнуть */
+function foodTray(p, ll, refs, onFed) {
+  const tray = h('div.pt-tray');
+  const fill = () => {
+    const foods = Object.keys(state.items).filter((id) => eatValue(id) != null)
+      .sort((a, b) => eatValue(b) - eatValue(a)).slice(0, 12);
+    tray.replaceChildren(...(foods.length
+      ? foods.map((id) => {
+        const b = h('button.pt-food', h('span', getItem(id).emoji), h('small', '×' + state.items[id]));
+        b.addEventListener('pointerdown', (e) => drag(e, id, b));
+        return b;
+      })
+      : [h('div.pt-tray-empty', '🍽️ еды нет — ищи в играх')]));
+  };
+  const feed = (id) => {
+    if (p.food >= 100) { ll.refuse(isFem(p.name) ? 'Я сыта!' : 'Я сыт!'); return false; }
+    if (!removeItem(id)) return false;
+    const v = eatValue(id);
+    p.food = clamp(p.food + v * 4);
+    refs.food.textContent = p.food + '%';
+    ll.eat();
+    setTimeout(() => ll.setMood({ food: p.food, joy: p.joy, sleep: false }), 1400);
+    addPetXP(p, v);
+    commit();
+    onFed();
+    fill();
+    return true;
+  };
+  function drag(e, id, btn) {
+    const ghost = h('div.pt-ghost', getItem(id).emoji);
+    const r0 = btn.getBoundingClientRect();
+    const x0 = e.clientX, y0 = e.clientY;
+    let moved = false, near = false;
+    const place = (x, y) => { ghost.style.left = x + 'px'; ghost.style.top = y + 'px'; };
+    const onMove = (ev) => {
+      if (!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 8) return;
+      if (!moved) { moved = true; document.body.append(ghost); }
+      place(ev.clientX, ev.clientY - 30);
+      ll.lookAtClient(ev.clientX, ev.clientY - 30);
+      const m = ll.mouthClient();
+      const n = Math.hypot(ev.clientX - m.x, ev.clientY - 30 - m.y) < 90;
+      if (n !== near) { near = n; ll.want(n); }
+    };
+    const end = (ev) => {
+      removeEventListener('pointermove', onMove);
+      removeEventListener('pointerup', end);
+      removeEventListener('pointercancel', cancel);
+      if (!moved) { // тап: еда сама летит ко рту
+        const m = ll.mouthClient();
+        place(r0.left + r0.width / 2, r0.top + r0.height / 2);
+        document.body.append(ghost);
+        ll.want(true);
+        requestAnimationFrame(() => { ghost.classList.add('fly'); place(m.x, m.y); });
+        setTimeout(() => { ghost.remove(); ll.want(false); feed(id); }, 380);
+        return;
+      }
+      ll.want(false);
+      if (near) { ghost.remove(); feed(id); }
+      else { ghost.classList.add('drop'); setTimeout(() => ghost.remove(), 250); }
+    };
+    const cancel = () => { // браузер забрал жест (прокрутка полки)
+      removeEventListener('pointermove', onMove);
+      removeEventListener('pointerup', end);
+      removeEventListener('pointercancel', cancel);
+      ghost.remove();
+      ll.want(false);
+    };
+    addEventListener('pointermove', onMove);
+    addEventListener('pointerup', end);
+    addEventListener('pointercancel', cancel);
+  }
+  fill();
+  return tray;
 }
 
 function tile(cls, icon, label, value, extra) {
@@ -241,7 +405,7 @@ function feedModal(p, rerender) {
 // У каждого зверя любимые категории — подарок из них радует вдвое сильнее.
 export const FAVS = {
   cat: ['decor', 'dishes', 'furniture'], dog: ['sport', 'tools', 'furniture'], hamster: ['plants', 'stationery', 'decor'],
-  rabbit: ['plants', 'bath', 'light'], parrot: ['music', 'tech', 'walldecor'], fox: ['fantasy', 'nature', 'transport'],
+  rabbit: ['plants', 'bath', 'light'], llama: ['plants', 'clothes', 'music'], parrot: ['music', 'tech', 'walldecor'], fox: ['fantasy', 'nature', 'transport'],
 };
 const GIFT_JOY = { c: 4, r: 8, e: 16, l: 30 };
 function giftModal(p, rerender) {
@@ -411,6 +575,26 @@ function claim(p, frac, rerender) {
 
 // ---------- Стили ----------
 const CSS = `
+.ll-card { cursor: default; min-height: 0; padding-bottom: 12px; }
+.ll-card:active { transform: none; }
+.ll-card.night { background: #1d1b3a; color: #fff; box-shadow: 0 6px 0 #000;
+  background-image: radial-gradient(2px 2px at 18% 30%, #fff8, transparent), radial-gradient(2px 2px at 78% 22%, #fff9, transparent),
+  radial-gradient(1.5px 1.5px at 62% 48%, #fff7, transparent), radial-gradient(2px 2px at 30% 62%, #fff6, transparent), radial-gradient(1.5px 1.5px at 88% 58%, #fff8, transparent); }
+.pt-moon { position: absolute; right: 18px; top: 16px; font-size: 40px; }
+.ll-card .pt-chips { margin-top: 10px; }
+.pt-stage { display: flex; justify-content: center; padding: 30px 0 0; }
+.pt-tray { display: flex; gap: 8px; overflow-x: auto; padding: 10px 2px 4px; margin: 6px -6px 0; scrollbar-width: none; touch-action: pan-x; }
+.pt-tray::-webkit-scrollbar { display: none; }
+.pt-food { flex: none; position: relative; width: 58px; height: 58px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px var(--ink);
+  display: grid; place-items: center; cursor: grab; touch-action: pan-x; -webkit-user-select: none; user-select: none; }
+.pt-food span { font-size: 30px; line-height: 1; pointer-events: none; }
+.pt-food small { position: absolute; right: -4px; bottom: -4px; background: var(--ink); color: #fff; border-radius: 99px; padding: 1px 6px; font-size: 11px; font-weight: 900; }
+.pt-tray-empty { font-weight: 800; font-size: 14px; opacity: .6; padding: 8px 6px; }
+.pt-ghost { position: fixed; z-index: 999; font-size: 48px; line-height: 1; transform: translate(-50%, -50%); pointer-events: none; filter: drop-shadow(0 6px 0 rgba(0,0,0,.18)); }
+.pt-ghost.fly { transition: left .35s cubic-bezier(.4,0,.6,1), top .35s cubic-bezier(.3,-0.6,.7,1), transform .35s; transform: translate(-50%, -50%) scale(.5); }
+.pt-ghost.drop { transition: opacity .25s, transform .25s; opacity: 0; transform: translate(-50%, -20%) scale(.6); }
+.pt-chip { border: 0; font-family: inherit; }
+.pt-offer { border: 0; width: 100%; text-align: left; cursor: pointer; }
 .pt-screen { --pt-y: #eef24a; --pt-g: rgba(17,17,17,.07); padding-top: 8px; }
 .pt-stack { display: flex; flex-direction: column; gap: 14px; }
 .pt-card { position: relative; display: flex; flex-direction: column; width: 100%; box-sizing: border-box; min-height: 380px; border-radius: 32px;
