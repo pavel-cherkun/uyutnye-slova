@@ -10,7 +10,8 @@ import { renderBag } from './screens/bag.js';
 import { renderOven } from './screens/oven.js';
 import { renderGames, GAMES, gameIcon, flowNodes, lockedReason } from './screens/games.js';
 import { loadDict } from './data/dict.js';
-import { renderOrders, readyOrders } from './screens/orders.js';
+import { renderTravel, travelBadge } from './screens/travel.js';
+import { petTip, GAME_TIPS } from './ui/petTip.js';
 import { setupDevice } from './ui/device.js';
 import { maybeDailyGift, maybeIosHint } from './screens/settings.js';
 import { syncLetters, levelInfo, gainXP, chestReward, CHEST_EVERY } from './progression.js';
@@ -24,10 +25,10 @@ const TABS = [
   { id: 'bag', icon: '🎒', label: 'Сумка' },
   { id: 'games', icon: '▶', label: 'Играть', play: true },
   { id: 'oven', icon: '🔥', label: 'Печь' },
-  { id: 'orders', icon: '📋', label: 'Заказы' },
+  { id: 'travel', icon: '🗺️', label: 'Мир', badge: travelBadge },
 ];
 
-let current = 'games';
+let current = state.pet || !state.created ? 'games' : 'pet';
 let hudEl, screenEl, tabbarEl;
 let gameOpen = false;
 
@@ -38,7 +39,7 @@ function boot() {
     app.replaceChildren();
     const root = h('div', { style: { display: 'contents' } });
     app.append(root);
-    renderCreate(root, () => { current = 'games'; boot(); });
+    renderCreate(root, () => { current = 'pet'; boot(); }); // игра начинается с выбора питомца
     return;
   }
   hudEl = h('div.hud');
@@ -96,7 +97,7 @@ function renderHud() {
 
 let tabsKey = '';
 function renderTabs(force) {
-  const badges = TABS.map((t) => (t.id === 'orders' ? readyOrders() : t.play ? dailyReady() : t.badge ? t.badge() : 0));
+  const badges = TABS.map((t) => (t.play ? dailyReady() : t.badge ? t.badge() : 0));
   const key = current + '|' + badges.join(',');
   if (!force && key === tabsKey) return; // ничего не изменилось — кнопки не трогаем
   tabsKey = key;
@@ -116,7 +117,7 @@ function go(id) {
 function refresh() {
   if (!screenEl) return;
   const scroll = screenEl.querySelector('.screen')?.scrollTop || 0;
-  const r = { pet: renderPet, games: renderGames, bag: renderBag, oven: renderOven, orders: renderOrders, me: renderProfile }[current];
+  const r = { pet: renderPet, games: renderGames, bag: renderBag, oven: renderOven, travel: renderTravel, me: renderProfile }[current];
   r(screenEl, current === 'me' ? () => { renderHud(); refresh(); } : nav);
   const sc = screenEl.querySelector('.screen');
   if (sc) sc.scrollTop = scroll;
@@ -218,6 +219,9 @@ async function openGame(id) {
   };
   try {
     cleanup = mod.mount(layer, ctx);
+    // питомец подсказывает: одна короткая фраза в начале партии
+    const tips = GAME_TIPS[id];
+    if (tips && state.pet) setTimeout(() => layer.isConnected && petTip(tips[Math.floor(Math.random() * tips.length)]), 700);
   } catch (e) {
     console.error(e);
     toast('Ошибка в игре: ' + e.message);
