@@ -4,8 +4,8 @@
 // Гардероб (шерсть, головной убор, очки, шея, попона) рисуется отдельными слоями.
 
 import { sfx, buzz } from './device.js';
+import { INK, S, f1, furPath, furPart, ellipsePts, eye } from './rig.js';
 
-const INK = '#111';
 let uid = 0;
 
 // ---------- Шерсть ----------
@@ -19,6 +19,8 @@ export const WOOL = {
   mint: ['#d6f5e3', '#98d3b3', '#f2fff7'],
   lavender: ['#e8ddff', '#b4a1ec', '#f7f2ff'],
   choco: ['#ad754e', '#7a4c30', '#e3b98f'],
+  fox: ['#ff9d52', '#dc6c2a', '#fff6ec'],
+  emerald: ['#74d95a', '#3f9e33', '#d8ffb8'],
 };
 
 // ---------- Гардероб: что есть и какое слово нужно набрать, чтобы получить ----------
@@ -31,6 +33,8 @@ export const WARDROBE = [
   { slot: 'wool', id: 'mint', word: 'МЯТА', name: 'Мята', icon: '🌿' },
   { slot: 'wool', id: 'lavender', word: 'ЛАВАНДА', name: 'Лаванда', icon: '💜' },
   { slot: 'wool', id: 'choco', word: 'ШОКОЛАД', name: 'Шоколад', icon: '🍫' },
+  { slot: 'wool', id: 'fox', word: 'РЫЖИК', name: 'Рыжик', icon: '🦊' },
+  { slot: 'wool', id: 'emerald', word: 'ИЗУМРУД', name: 'Изумруд', icon: '💚' },
   { slot: 'head', id: 'chullo', word: 'ШАПКА', name: 'Шапка', icon: '🧶' },
   { slot: 'head', id: 'bandana', word: 'БАНДАНА', name: 'Бандана', icon: '🏴‍☠️' },
   { slot: 'head', id: 'cap', word: 'КЕПКА', name: 'Кепка', icon: '🧢' },
@@ -79,87 +83,6 @@ export const SLOTS = [
 // Шерсть рисуется по силуэту: точки силуэта → гладкая кривая → остроконечные пряди с наклоном.
 // Светотень — та же прядь, сдвинутая к свету (сверху-слева) и обрезанная силуэтом: тень ложится по форме прядей.
 
-function prng(seed) { let x = seed % 2147483647 || 1; return () => (x = (x * 16807) % 2147483647) / 2147483647; }
-const f1 = (v) => Math.round(v * 10) / 10;
-
-/** Плавная замкнутая кривая через точки (Catmull-Rom), равномерно пересэмплированная с шагом step */
-function resample(pts, step) {
-  const dense = [];
-  const n = pts.length;
-  for (let i = 0; i < n; i++) {
-    const p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
-    for (let k = 0; k < 12; k++) {
-      const t = k / 12, t2 = t * t, t3 = t2 * t;
-      dense.push([0, 1].map((j) => 0.5 * ((2 * p1[j]) + (-p0[j] + p2[j]) * t + (2 * p0[j] - 5 * p1[j] + 4 * p2[j] - p3[j]) * t2 + (-p0[j] + 3 * p1[j] - 3 * p2[j] + p3[j]) * t3)));
-    }
-  }
-  let total = 0;
-  const seg = dense.map((p, i) => { const q = dense[(i + 1) % dense.length]; const l = Math.hypot(q[0] - p[0], q[1] - p[1]); total += l; return l; });
-  const cnt = Math.max(6, Math.round(total / step)), d = total / cnt, out = [];
-  let acc = 0, i = 0;
-  for (let k = 0; k < cnt; k++) {
-    const target = k * d;
-    while (acc + seg[i] < target) { acc += seg[i]; i = (i + 1) % dense.length; }
-    const t = (target - acc) / (seg[i] || 1), p = dense[i], q = dense[(i + 1) % dense.length];
-    out.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]);
-  }
-  return out;
-}
-const areaSign = (pts) => (pts.reduce((a, p, i) => { const q = pts[(i + 1) % pts.length]; return a + p[0] * q[1] - q[0] * p[1]; }, 0) > 0 ? 1 : -1);
-
-/** Силуэт с прядями. depth — длина пряди, lean — наклон (0 — симметрично), smooth — участки без прядей (индексы точек силуэта). */
-function furPath(pts, { step = 15, depth = 8, lean = 0.3, seed = 1, jitter = 0.4 } = {}) {
-  const s = resample(pts, step), sg = areaSign(s), r = prng(seed);
-  let d = `M${f1(s[0][0])} ${f1(s[0][1])}`;
-  for (let i = 0; i < s.length; i++) {
-    const a = s[i], b = s[(i + 1) % s.length];
-    const tx = b[0] - a[0], ty = b[1] - a[1], L = Math.hypot(tx, ty) || 1;
-    const nx = (sg * ty) / L, ny = (-sg * tx) / L;
-    const dep = depth * (1 - jitter + r() * jitter * 2);
-    const u = 0.55 + lean * 0.35;
-    const tip = [a[0] + tx * u + nx * dep, a[1] + ty * u + ny * dep];
-    const c1 = [a[0] + tx * 0.1 + nx * dep * 0.85, a[1] + ty * 0.1 + ny * dep * 0.85];
-    const c2 = [tip[0] - tx * 0.22, tip[1] - ty * 0.22];
-    const c3 = [b[0] - tx * 0.18 + nx * dep * 0.1, b[1] - ty * 0.18 + ny * dep * 0.1];
-    d += `C${f1(c1[0])} ${f1(c1[1])} ${f1(c2[0])} ${f1(c2[1])} ${f1(tip[0])} ${f1(tip[1])}Q${f1(c3[0])} ${f1(c3[1])} ${f1(b[0])} ${f1(b[1])}`;
-  }
-  return d + 'Z';
-}
-const ellipsePts = (cx, cy, rx, ry, n = 16, rot = 0) => Array.from({ length: n }, (_, i) => {
-  const t = (i / n) * Math.PI * 2, c = Math.cos(rot), sn = Math.sin(rot), x = Math.cos(t) * rx, y = Math.sin(t) * ry;
-  return [cx + x * c - y * sn, cy + x * sn + y * c];
-});
-const inside = (pts, x, y) => { let c = false; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) { const [xi, yi] = pts[i], [xj, yj] = pts[j]; if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c; } return c; };
-/** Штрихи фактуры шерсти внутри силуэта */
-function furStrokes(pts, n, seed, box) {
-  const r = prng(seed), out = [];
-  let guard = 0;
-  while (out.length < n && guard++ < n * 30) {
-    const x = box[0] + r() * (box[2] - box[0]), y = box[1] + r() * (box[3] - box[1]);
-    if (!inside(pts, x, y)) continue;
-    const w = 5 + r() * 4, h = 3 + r() * 3, k = (r() - 0.5) * 4;
-    out.push(`M${f1(x - w)} ${f1(y + h)}Q${f1(x + k)} ${f1(y - h)} ${f1(x + w)} ${f1(y + h * 0.6)}`);
-  }
-  return out.join('');
-}
-
-/**
- * Пушистая часть с контуром и светотенью. id — для clipPath; light — сдвиг блика.
- * Слои: контур (толстая обводка) → тень (весь силуэт) → светлая часть (сдвинутая к свету, обрезанная) → блик.
- */
-function furPart(id, pts, opts = {}, { stroke = 6, light = [-4, -7], strokes = 0, box = null, seed = 3, inner = '' } = {}) {
-  const d = furPath(pts, opts);
-  const cx = pts.reduce((a, p) => a + p[0], 0) / pts.length, cy = pts.reduce((a, p) => a + p[1], 0) / pts.length;
-  return `<clipPath id="${id}"><path d="${d}"/></clipPath>
-    <path d="${d}" class="ws" stroke="${INK}" stroke-width="${stroke}" stroke-linejoin="round"/>
-    <g clip-path="url(#${id})">
-      <path d="${d}" class="wm" transform="translate(${light[0]} ${light[1]}) translate(${f1(cx)} ${f1(cy)}) scale(.97) translate(${f1(-cx)} ${f1(-cy)})"/>
-      <path d="${d}" fill="#fff" opacity=".42" transform="translate(${light[0] * 2.4} ${light[1] * 2.4}) translate(${f1(cx)} ${f1(cy)}) scale(.86) translate(${f1(-cx)} ${f1(-cy)})"/>
-      ${inner}
-      ${strokes && box ? `<path d="${furStrokes(pts, strokes, seed, box)}" fill="none" class="wsl" stroke-width="2.6" stroke-linecap="round"/>` : ''}
-    </g>`;
-}
-
 // силуэт тела вместе с шеей и грудкой
 const BODY_PTS = [[98, 78], [94, 112], [90, 150], [80, 180], [82, 208], [96, 236], [122, 256], [160, 266], [200, 268], [236, 262], [262, 246], [276, 220], [272, 192], [252, 175], [214, 167], [178, 169], [156, 163], [146, 142], [140, 110], [136, 78]];
 // голова ламы: широкая у глаз и ушей, книзу — длинная узкая морда
@@ -167,33 +90,12 @@ const HEAD_PTS = [[114, 38], [140, 42], [158, 58], [163, 78], [156, 96], [145, 1
 const TUFT_PTS = [[88, 54], [92, 38], [104, 27], [122, 25], [138, 33], [146, 48], [136, 56], [124, 50], [112, 58], [100, 55]];
 const TAIL_PTS = ellipsePts(268, 180, 15, 21, 12, -0.5);
 
-const S = `stroke="${INK}" stroke-linejoin="round" stroke-linecap="round"`;
 function leg(cx, top, cls, n, sock) {
   return `<path d="M${cx - 12} ${top} L${cx + 12} ${top} L${cx + 9} 293 L${cx - 9} 293 Z" class="${cls}" ${S} stroke-width="5"/>
     <path d="M${cx - 11} 290 L${cx + 11} 290 L${cx + 8} 309 Q${cx} 313 ${cx - 8} 309 Z" fill="#6b4428" ${S} stroke-width="4.5"/>
     <path d="M${cx} 295 L${cx} 308" stroke="#3a2416" stroke-width="2.5" stroke-linecap="round"/>
     ${sock ? `<path d="M${cx + 4} ${top + 10} L${cx + 6} 288" stroke="rgba(90,60,30,.18)" stroke-width="5" stroke-linecap="round"/>` : ''}`;
 }
-
-const eye = (side, cx, cy, r, clip, lash) => `<g class="ll-eye ll-eye-${side}">
-  <g class="ll-eo"><circle cx="${cx}" cy="${cy}" r="${r}" fill="#fff" ${S} stroke-width="4"/>
-    <clipPath id="${clip}"><circle cx="${cx}" cy="${cy}" r="${r - 1.5}"/></clipPath>
-    <g clip-path="url(#${clip})">
-      <g class="ll-pupil">
-        <circle cx="${cx}" cy="${cy + 1}" r="${f1(r * 0.66)}" fill="#3b2418"/>
-        <circle cx="${cx}" cy="${cy + 1}" r="${f1(r * 0.4)}" fill="${INK}"/>
-        <circle cx="${f1(cx - r * 0.28)}" cy="${f1(cy - r * 0.28)}" r="${f1(r * 0.22)}" fill="#fff"/>
-        <circle cx="${f1(cx + r * 0.25)}" cy="${f1(cy + r * 0.32)}" r="${f1(r * 0.1)}" fill="#fff"/>
-      </g>
-      <path d="M${cx - r} ${f1(cy + r * 0.55)} Q${cx} ${f1(cy + r * 1.1)} ${cx + r} ${f1(cy + r * 0.55)} L${cx + r} ${cy + r} L${cx - r} ${cy + r} Z" fill="rgba(0,0,0,.08)"/>
-      <rect class="ll-lid ws" x="${cx - r - 3}" y="${cy - r - 3}" width="${r * 2 + 6}" height="0" ${S} stroke-width="3.5"/>
-    </g>
-    <path d="M${f1(cx - r * 0.95)} ${f1(cy - r * 0.35)} Q${cx} ${f1(cy - r * 1.35)} ${f1(cx + r * 0.95)} ${f1(cy - r * 0.35)}" fill="none" ${S} stroke-width="5"/>
-    ${lash > 0 ? `<path d="M${f1(cx + r * 0.8)} ${f1(cy - r * 0.62)} l6 -5 M${f1(cx + r * 0.95)} ${f1(cy - r * 0.25)} l7 -2" fill="none" ${S} stroke-width="3.5"/>`
-      : `<path d="M${f1(cx - r * 0.8)} ${f1(cy - r * 0.62)} l-6 -5 M${f1(cx - r * 0.95)} ${f1(cy - r * 0.25)} l-7 -2" fill="none" ${S} stroke-width="3.5"/>`}
-  </g>
-  <path class="ll-eh" d="M${cx - r + 3} ${cy + 3} Q${cx} ${cy - r} ${cx + r - 3} ${cy + 3}"/>
-  <path class="ll-es" d="M${cx - r + 3} ${cy - 2} Q${cx} ${cy + r * 0.7} ${cx + r - 3} ${cy - 2}"/></g>`;
 
 const DIRT = [[170, 236, 12, 7], [210, 218, 9, 6], [140, 252, 8, 5], [236, 198, 7, 4], [104, 204, 6, 4], [116, 282, 6, 4], [218, 284, 6, 4], [192, 248, 6, 4], [84, 112, 5, 3]];
 
@@ -338,6 +240,27 @@ const BROW = {
   angry: ['M78 49 L102 57', 'M127 56 L148 48'],
 };
 
+// ---------- Виды питомцев ----------
+// Каждый вид: рисунок (markup), точки крепления (A), рты/брови и своя «обидная» реакция на частые тыки.
+const LLAMA = {
+  markup: svgMarkup,
+  A: {
+    ground: [165, 312], spin: [165, 220], body: [170, 276], head: [116, 150], lift: -40, earL: [86, 50], earR: [142, 48],
+    tail: [258, 186], tailAmp: 8, eyes: [[92, 76, 16], [137, 74, 14]], mouth: [114, 130], look: [114, 80],
+    fx: { z: [150, 0], spit: [112, 92], crumb: [112, 96], heart: [114, 0], note: [60, 20], sneeze: [70, 90] },
+  },
+  mouth: () => MOUTH, brow: () => BROW,
+  wool: 'cream',
+  // лама плюётся
+  angry(api) {
+    api.setMode('angry', 1200);
+    api.tilt.t = -5;
+    setTimeout(() => { api.tilt.t = 0; api.squash.v += 0.06; sfx('spit'); buzz([20, 30, 20]); api.puff('💦', ...api.A.fx.spit, 'spit'); api.say('Тьфу!', 1300); }, 650);
+  },
+};
+export const SPECIES = { llama: LLAMA };
+export function registerSpecies(kind, def) { SPECIES[kind] = def; }
+
 let cssDone = false;
 function injectCSS() {
   if (cssDone) return;
@@ -363,12 +286,16 @@ export function itemPreview(slot, id) {
  * Создать ламу. Колбэки: onPet() — порция поглаживания, onPoke() — тыкнули, onWake() — разбудили,
  * onSpit() — плюнула. opts.still — без реакции на касания (превью в гардеробе).
  */
-export function createLlama({ onPet, onPoke, onWake, onSpit, still = false } = {}) {
+export function createLlama(opts = {}) { return createPet('llama', opts); }
+
+/** Живой питомец любого вида (см. SPECIES). */
+export function createPet(kind, { onPet, onPoke, onWake, onSpit, still = false } = {}) {
   injectCSS();
+  const D = SPECIES[kind] || LLAMA, A = D.A, MOUTHS = D.mouth(), BROWS = D.brow();
   const n = ++uid;
   const wrap = document.createElement('div');
-  wrap.className = 'll-wrap';
-  wrap.innerHTML = svgMarkup(n) + '<div class="ll-fx"></div><div class="ll-say"></div>';
+  wrap.className = 'll-wrap pet-' + kind;
+  wrap.innerHTML = D.markup(n) + '<div class="ll-fx"></div><div class="ll-say"></div>';
   const svg = wrap.querySelector('svg');
   const q = (s) => svg.querySelector(s);
   const P = {
@@ -394,6 +321,7 @@ export function createLlama({ onPet, onPoke, onWake, onSpit, still = false } = {
   let taps = [], spitCool = 0;
   let mounted = false, raf = 0;
   let age = AGES.adult, spin = 0, spinV = 0, tricks = [];
+  let puffUp = 0, flip = 1, tailUp = 0; // для особых реакций видов
 
   const toWrap = (x, y) => { const s = wrap.clientWidth / 300; return [x * s, (y + 14) * s]; };
   const fromClient = (cx, cy) => {
@@ -416,6 +344,11 @@ export function createLlama({ onPet, onPoke, onWake, onSpit, still = false } = {
 
   let sayTimer = 0;
   function say(text, ms = 1500) {
+    // облачко — над макушкой (у видов голова на разной высоте)
+    try {
+      const r = q('.ll-hpt').getBoundingClientRect(), w = wrap.getBoundingClientRect();
+      if (w.width) { bubble.style.left = Math.max(40, Math.min(w.width - 40, r.left - w.left)) + 'px'; bubble.style.top = Math.max(-20, r.top - w.top - 8) + 'px'; }
+    } catch { /* ещё не на экране */ }
     bubble.textContent = text;
     bubble.classList.remove('on');
     void bubble.offsetWidth;
@@ -442,11 +375,11 @@ export function createLlama({ onPet, onPoke, onWake, onSpit, still = false } = {
   function refreshFace() {
     const f = face();
     svg.dataset.eyes = f.eyes;
-    const b = BROW[f.brow];
+    const b = BROWS[f.brow];
     P.bl.setAttribute('d', b ? b[0] : '');
     P.br.setAttribute('d', b ? b[1] : '');
     P.open.style.display = f.mouth === 'open' ? '' : 'none';
-    P.mouth.setAttribute('d', f.mouth === 'open' ? '' : MOUTH[f.mouth]);
+    P.mouth.setAttribute('d', f.mouth === 'open' ? '' : MOUTHS[f.mouth]);
     blush.t = f.eyes === 'happy' ? 1 : 0;
     const droop = asleep ? 1 : (mood === 'hungry' || mood === 'sad') ? 0.7 : 0;
     earL.t = -28 * droop; earR.t = 24 * droop;
@@ -481,26 +414,28 @@ export function createLlama({ onPet, onPoke, onWake, onSpit, still = false } = {
     const bl = blush.step();
 
     if (spinV) { spin += spinV; if (spin >= 360) { spin = 0; spinV = 0; } }
-    P.all.setAttribute('transform', `translate(0 ${hopY.toFixed(2)}) rotate(${spin.toFixed(1)} 165 220) translate(165 312) scale(${((1 - sq * 0.6) * age.all).toFixed(4)} ${((1 + sq) * age.all).toFixed(4)}) translate(-165 -312)`);
-    P.body.setAttribute('transform', `translate(170 276) scale(${(1 + br * 0.008).toFixed(4)} ${(1 + br * (asleep ? 0.03 : 0.016)).toFixed(4)}) translate(-170 -276)`);
-    P.head.setAttribute('transform', `translate(0 ${(bob + age.drop * 1.4 - 40).toFixed(2)}) rotate(${(tl + (asleep ? 7 : 0)).toFixed(2)} 116 150) translate(116 150) scale(${age.head}) translate(-116 -150)`);
-    P.earL.setAttribute('transform', `rotate(${eL.toFixed(2)} 86 50)`);
-    P.earR.setAttribute('transform', `rotate(${eR.toFixed(2)} 142 48)`);
-    P.tail.setAttribute('transform', `rotate(${(Math.sin(t * (mood === 'happy' || mode === 'joy' ? 9 : 2)) * 8).toFixed(2)} 258 186)`);
+    const [gx, gy] = A.ground, [sx0, sy0] = A.spin, [bx, by] = A.body, [hx, hy] = A.head;
+    P.all.setAttribute('transform', `translate(0 ${hopY.toFixed(2)}) rotate(${spin.toFixed(1)} ${sx0} ${sy0}) translate(${gx} ${gy}) scale(${((1 - sq * 0.6) * age.all * flip).toFixed(4)} ${((1 + sq) * age.all).toFixed(4)}) translate(${-gx} ${-gy})`);
+    P.body.setAttribute('transform', `translate(${bx} ${by}) scale(${(1 + br * 0.008 + puffUp).toFixed(4)} ${(1 + br * (asleep ? 0.03 : 0.016) + puffUp).toFixed(4)}) translate(${-bx} ${-by})`);
+    P.head.setAttribute('transform', `translate(0 ${(bob + age.drop * 1.4 + A.lift).toFixed(2)}) rotate(${(tl + (asleep ? 7 : 0)).toFixed(2)} ${hx} ${hy}) translate(${hx} ${hy}) scale(${age.head}) translate(${-hx} ${-hy})`);
+    P.earL.setAttribute('transform', `rotate(${eL.toFixed(2)} ${A.earL[0]} ${A.earL[1]})`);
+    P.earR.setAttribute('transform', `rotate(${eR.toFixed(2)} ${A.earR[0]} ${A.earR[1]})`);
+    P.tail.setAttribute('transform', `rotate(${(Math.sin(t * (mood === 'happy' || mode === 'joy' ? 9 : 2)) * A.tailAmp + tailUp).toFixed(2)} ${A.tail[0]} ${A.tail[1]})`);
     if (P.bell) P.bell.setAttribute('transform', `rotate(${(sw * 1.5).toFixed(2)} 114 162)`);
     const big = mode === 'want' ? 1.25 : 1;
     const lx = look.x.x, ly = look.y.x;
-    P.pupL.setAttribute('transform', `translate(${(lx * 6).toFixed(2)} ${(ly * 5).toFixed(2)}) translate(92 76) scale(${big}) translate(-92 -76)`);
-    P.pupR.setAttribute('transform', `translate(${(lx * 5).toFixed(2)} ${(ly * 4.5).toFixed(2)}) translate(137 74) scale(${big}) translate(-137 -74)`);
-    P.lidL.setAttribute('height', (lid * 38).toFixed(1));
-    P.lidR.setAttribute('height', (lid * 34).toFixed(1));
+    const [[e1x, e1y, e1r], [e2x, e2y, e2r]] = A.eyes;
+    P.pupL.setAttribute('transform', `translate(${(lx * e1r * 0.38).toFixed(2)} ${(ly * e1r * 0.32).toFixed(2)}) translate(${e1x} ${e1y}) scale(${big}) translate(${-e1x} ${-e1y})`);
+    P.pupR.setAttribute('transform', `translate(${(lx * e2r * 0.36).toFixed(2)} ${(ly * e2r * 0.32).toFixed(2)}) translate(${e2x} ${e2y}) scale(${big}) translate(${-e2x} ${-e2y})`);
+    P.lidL.setAttribute('height', (lid * (e1r * 2 + 6)).toFixed(1));
+    P.lidR.setAttribute('height', (lid * (e2r * 2 + 6)).toFixed(1));
     for (const c of P.cheeks) c.setAttribute('opacity', (0.35 + bl * 0.6).toFixed(2));
 
     const chew = mode === 'eat' ? 0.55 + Math.abs(Math.sin(t * 11)) * 0.5 : mode === 'want' ? 1.1 : 1;
-    P.open.setAttribute('transform', `translate(114 130) scale(1 ${chew.toFixed(3)}) translate(-114 -130)`);
+    P.open.setAttribute('transform', `translate(${A.mouth[0]} ${A.mouth[1]}) scale(1 ${chew.toFixed(3)}) translate(${-A.mouth[0]} ${-A.mouth[1]})`);
     P.mouth.setAttribute('transform', now < chewUntil ? `translate(${(Math.sin(t * 9) * 2.6).toFixed(2)} 0)` : '');
 
-    if (asleep && mode !== 'pet' && now > nextZ) { nextZ = now + 1500; puff('z', 150, 30, 'z'); }
+    if (asleep && mode !== 'pet' && now > nextZ) { nextZ = now + 1500; puff('z', ...A.fx.z, 'z'); }
     if (now > nextIdle && mode === 'idle') idle(now);
 
     raf = requestAnimationFrame(frame);
@@ -516,7 +451,7 @@ export function createLlama({ onPet, onPoke, onWake, onSpit, still = false } = {
     else if (r < 0.45) chewUntil = now + rnd(1500, 2800);
     else if (r < 0.62) { tilt.t = rnd(-9, 9); setTimeout(() => (tilt.t = 0), rnd(900, 1800)); }
     else if (r < 0.75 && mood === 'happy') { hop(6); setTimeout(() => hop(5), 380); }
-    else if (r < 0.85 && mood === 'happy') { sfx('hum'); puff('♪', 60, 60, 'note'); }
+    else if (r < 0.85 && mood === 'happy') { sfx('hum'); puff('♪', ...A.fx.note, 'note'); }
     else if (r < 0.92 && tricks.length && mood === 'happy') perform(tricks[Math.floor(Math.random() * tricks.length)]);
     else { twitch('l'); setTimeout(() => twitch('r'), 160); }
   }
@@ -526,7 +461,7 @@ export function createLlama({ onPet, onPoke, onWake, onSpit, still = false } = {
     if (asleep) { asleep = false; groggyUntil = 0; }
     if (id === 'dance') {
       setMode('joy', 1900);
-      [0, 380, 760, 1140, 1520].forEach((d, i) => setTimeout(() => { tilt.t = i % 2 ? 12 : -12; hop(6); if (i % 2) puff('♪', 60 + Math.random() * 180, 40, 'note'); }, d));
+      [0, 380, 760, 1140, 1520].forEach((d, i) => setTimeout(() => { tilt.t = i % 2 ? 12 : -12; hop(6); if (i % 2) puff('♪', A.fx.note[0] + Math.random() * 180, A.fx.note[1], 'note'); }, d));
       setTimeout(() => (tilt.t = 0), 1900);
       sfx('happy');
     } else if (id === 'bow') {
@@ -536,11 +471,11 @@ export function createLlama({ onPet, onPoke, onWake, onSpit, still = false } = {
     } else if (id === 'sneeze') {
       setMode('angry', 500);
       tilt.t = 6;
-      setTimeout(() => { tilt.t = -14; squash.v -= 0.12; sfx('spit'); puff('💨', 70, 130); say('Апчхи!', 1100); setMode('joy', 600); }, 450);
+      setTimeout(() => { tilt.t = -14; squash.v -= 0.12; sfx('spit'); puff('💨', ...A.fx.sneeze); say('Апчхи!', 1100); setMode('joy', 600); }, 450);
       setTimeout(() => (tilt.t = 0), 900);
     } else if (id === 'song') {
       setMode('want', 1800);
-      [0, 450, 900, 1350].forEach((d) => setTimeout(() => { sfx('hum'); puff(Math.random() < 0.5 ? '♪' : '♫', 60 + Math.random() * 60, 70, 'note'); tilt.t = Math.random() * 10 - 5; }, d));
+      [0, 450, 900, 1350].forEach((d) => setTimeout(() => { sfx('hum'); puff(Math.random() < 0.5 ? '♪' : '♫', A.fx.note[0] + Math.random() * 60, A.fx.note[1] + 10, 'note'); tilt.t = Math.random() * 10 - 5; }, d));
       setTimeout(() => (tilt.t = 0), 1800);
     } else if (id === 'flip') {
       setMode('joy', 1200);
@@ -557,8 +492,8 @@ export function createLlama({ onPet, onPoke, onWake, onSpit, still = false } = {
     try { svg.setPointerCapture(e.pointerId); } catch { /* нет захвата */ }
   }
   function aim(sx, sy) {
-    look.x.t = clamp((sx - 114) / 110, -1, 1);
-    look.y.t = clamp((sy - 86) / 120, -0.8, 1);
+    look.x.t = clamp((sx - A.look[0]) / 110, -1, 1);
+    look.y.t = clamp((sy - A.look[1] - A.lift) / 120, -0.8, 1);
   }
   function onMove(e) {
     lastPointer = performance.now();
@@ -594,7 +529,7 @@ export function createLlama({ onPet, onPoke, onWake, onSpit, still = false } = {
   function poke(e) {
     const now = performance.now();
     const [sx, sy] = fromClient(e.clientX, e.clientY);
-    squash.v -= 0.09;
+    squash.v = Math.max(squash.v - 0.09, -0.12); // частые тыки не сплющивают в блин
     sfx('boop');
     buzz(6);
     if (asleep) {
@@ -618,18 +553,11 @@ export function createLlama({ onPet, onPoke, onWake, onSpit, still = false } = {
     else { twitch(); aim(sx, sy); }
   }
 
+  // своя «обидная» реакция у каждого вида: лама плюётся, кот шипит и т. д.
   function spit() {
-    setMode('angry', 1200);
-    tilt.t = -5;
-    setTimeout(() => {
-      tilt.t = 0;
-      squash.v += 0.06;
-      sfx('spit');
-      buzz([20, 30, 20]);
-      puff('💦', 112, 130, 'spit');
-      say('Тьфу!', 1300);
-      onSpit?.();
-    }, 650);
+    D.angry({ A, P, svg, setMode, say, puff, tilt, squash, earL, earR, hop, twitch,
+      setPuff: (v) => { puffUp = v; }, setFlip: (v) => { flip = v; }, setTail: (v) => { tailUp = v; }, spinOnce: () => { hopV = -12; spinV = 13; } });
+    setTimeout(() => onSpit?.(), 700);
   }
 
   if (!still) {
@@ -670,7 +598,7 @@ export function createLlama({ onPet, onPoke, onWake, onSpit, still = false } = {
     bump() { if (asleep) { asleep = false; groggyUntil = 0; refreshFace(); } hopV = -8; squash.v -= 0.08; tilt.v -= 4; sfx('boop'); setMode('joy', 500); },
     /** Наряд: { wool, head, eyes, neck, back } */
     setLook(lk = {}) {
-      const [m, s, f] = WOOL[lk.wool] || WOOL.cream;
+      const [m, s, f] = WOOL[lk.wool] || WOOL[D.wool] || WOOL.cream;
       svg.style.setProperty('--wm', m);
       svg.style.setProperty('--ws', s);
       svg.style.setProperty('--wf', f);
@@ -710,7 +638,7 @@ export function createLlama({ onPet, onPoke, onWake, onSpit, still = false } = {
       sfx('munch');
       setTimeout(() => sfx('munch'), 420);
       setTimeout(() => sfx('munch'), 840);
-      for (let i = 0; i < 4; i++) setTimeout(() => puff('•', 112 + rnd(-14, 14), 136, 'crumb'), i * 250);
+      for (let i = 0; i < 4; i++) setTimeout(() => puff('•', A.fx.crumb[0] + rnd(-14, 14), A.fx.crumb[1], 'crumb'), i * 250);
       setTimeout(() => { setMode('joy', 900); hop(6); say('Ням!', 1100); }, 1300);
     },
     /** Порадоваться (подарок, обновка, встреча) */
@@ -720,7 +648,7 @@ export function createLlama({ onPet, onPoke, onWake, onSpit, still = false } = {
       hop(8);
       setTimeout(() => hop(6), 420);
       sfx('happy');
-      for (let i = 0; i < 3; i++) setTimeout(() => puff('💗', 114 + rnd(-60, 60), 40), i * 180);
+      for (let i = 0; i < 3; i++) setTimeout(() => puff('💗', A.fx.heart[0] + rnd(-60, 60), A.fx.heart[1]), i * 180);
       if (text) say(text, 1600);
     },
     refuse(text) { twitch('l'); twitch('r'); tilt.t = 8; setTimeout(() => (tilt.t = 0), 500); say(text || '🙅', 1200); },
