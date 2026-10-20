@@ -252,3 +252,36 @@ button { touch-action: manipulation; }
 .gm-stash.ready { background: var(--lime); color: var(--ink); opacity: 1; }
 .ov-swap { display: flex; flex-wrap: wrap; gap: 6px; }
 .ov-swap .tile { border: 0; cursor: pointer; }
+
+/* главная цепочка */
+.gm-core { background: #0c0c0c; color: #fff; border-radius: 30px; padding: 18px 16px 18px; margin-bottom: 16px; }
+.gm-core-t { margin-bottom: 12px; }
+.gm-core-t b { display: block; font-family: var(--display); font-weight: 900; font-size: 40px; line-height: .95; letter-spacing: -2px; }
+.gm-core-t i { font-family: var(--display); font-weight: 300; font-style: italic; font-size: 22px; letter-spacing: -.5px; }
+.gm-core-btn { width: 100%; display: flex; align-items: center; gap: 12px; border: 2px solid #fff; border-radius: 999px; background: transparent; color: #fff;
+  padding: 7px 18px 7px 7px; cursor: pointer; text-align: left; }
+.gm-core-btn.now { background: var(--lime); color: #111; border-color: var(--lime); animation: gm-now 1.8s ease-in-out infinite; }
+@keyframes gm-now { 50% { box-shadow: 0 0 0 6px rgba(200,255,46,.25); } }
+.gm-core-ic { flex: none; width: 54px; height: 54px; border-radius: 50%; background: #fff; display: grid; place-items: center; font-size: 28px; color: #111; }
+.gm-core-tx { flex: 1; display: flex; flex-direction: column; }
+.gm-core-tx b { font-family: var(--display); font-weight: 900; font-size: 22px; letter-spacing: -.5px; line-height: 1.1; }
+.gm-core-tx span { font-size: 13px; font-weight: 700; opacity: .8; }
+.gm-core-go { font-weight: 900; font-size: 15px; }
+.gm-core-mid { display: flex; align-items: center; gap: 10px; padding: 8px 0 8px 22px; }
+.gm-core-arr { font-size: 24px; font-weight: 900; opacity: .7; width: 22px; text-align: center; }
+.gm-core-ltrs { display: flex; gap: 4px; }
+.gm-core-n { font-size: 13px; font-weight: 800; opacity: .75; }
+.gm-core-out { display: flex; align-items: center; gap: 12px; background: #1d1c22; border-radius: 22px; padding: 12px 14px; }
+.gm-core-gift { flex: none; width: 54px; height: 54px; border-radius: 50%; background: #2c2b33; display: grid; place-items: center; font-size: 28px; }
+.gm-core-out .gm-core-tx b { font-size: 16px; }
+.gm-sec { margin: 4px 4px 10px; font-size: 16px; color: #444; }
+.gm-sec i { font-family: var(--display); font-weight: 300; font-style: italic; }
+.gm-teaser { display: flex; align-items: center; gap: 12px; border: 2px dashed #111; border-radius: 24px; padding: 12px 14px; margin: 14px 0; background: #fff; }
+.gm-teaser-ic { font-size: 28px; }
+.gm-teaser-t { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.gm-teaser-t b { font-family: var(--display); font-weight: 800; font-size: 16px; }
+.gm-teaser-t span { font-size: 12px; font-weight: 700; color: #555; }
+.gm-teaser-bar { height: 8px; border-radius: 99px; background: rgba(17,17,17,.1); overflow: hidden; margin-top: 4px; }
+.gm-teaser-bar i { display: block; height: 100%; background: var(--lime); box-shadow: inset 0 0 0 1.5px #111; border-radius: 99px; }
+.gm-new-badge { align-self: center; margin: 0 auto 6px; background: var(--lime); color: #111; border-radius: 99px; padding: 6px 14px; font-family: var(--display); font-weight: 900; font-size: 14px; text-transform: uppercase; box-shadow: 0 0 0 3px #111; }
+.tab-ph { visibility: hidden; pointer-events: none; }

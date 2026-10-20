@@ -20,13 +20,21 @@ import { dailyReady } from './screens/daily.js';
 
 const app = document.getElementById('app');
 // «Играть» — большая кнопка по центру меню
+// Вкладки открываются по мере роста — новичок видит только питомца, игры и (с первой вещью) сумку.
+const lvlNow = () => levelInfo().lvl;
 const TABS = [
   { id: 'pet', icon: '🐾', label: 'Питомец', badge: petBadge },
-  { id: 'bag', icon: '🎒', label: 'Сумка' },
+  { id: 'bag', icon: '🎒', label: 'Сумка', open: () => Object.keys(state.items).length > 0 || lvlNow() >= 2 },
   { id: 'games', icon: '▶', label: 'Играть', play: true },
-  { id: 'oven', icon: '🔥', label: 'Печь' },
-  { id: 'travel', icon: '🗺️', label: 'Мир', badge: travelBadge },
+  { id: 'oven', icon: '🔥', label: 'Печь', open: () => lvlNow() >= 2 },
+  { id: 'travel', icon: '🗺️', label: 'Мир', badge: travelBadge, open: () => lvlNow() >= 3 && !!state.pet },
 ];
+const tabOpen = (t) => !t.open || t.open();
+/** Новая вкладка — значок «!», пока её не открыли */
+function tabIsNew(t) {
+  if (!t.open || !tabOpen(t)) return false;
+  return !state.progress.tabsSeen.includes(t.id);
+}
 
 let current = state.pet || !state.created ? 'games' : 'pet';
 let hudEl, screenEl, tabbarEl;
@@ -86,6 +94,9 @@ function renderHud() {
   hudRefs.lvl.textContent = `УР. ${lv.lvl}`;
   hudRefs.xpT.textContent = `${lv.cur}/${lv.need} ⭐`;
   hudRefs.xpBar.style.width = Math.round((lv.cur / lv.need) * 100) + '%';
+  // энергия нужна со 2-го уровня (первые игры бесплатные), ключи — когда появились
+  hudRefs.pills.energy.el.style.display = lvlNow() >= 2 ? '' : 'none';
+  hudRefs.pills.keys.el.style.display = state.keys > 0 || lvlNow() >= 3 ? '' : 'none';
   for (const [k, ref] of Object.entries(hudRefs.pills)) {
     if (ref.num.textContent !== String(vals[k])) {
       ref.num.textContent = vals[k];
@@ -97,11 +108,14 @@ function renderHud() {
 
 let tabsKey = '';
 function renderTabs(force) {
-  const badges = TABS.map((t) => (t.play ? dailyReady() : t.badge ? t.badge() : 0));
-  const key = current + '|' + badges.join(',');
+  // при первом запуске уже открытые вкладки считаем знакомыми
+  state.progress.tabsSeen ||= TABS.filter((x) => x.open && tabOpen(x)).map((x) => x.id);
+  const badges = TABS.map((t) => (!tabOpen(t) ? 0 : tabIsNew(t) ? '!' : t.play ? (lvlNow() >= 2 ? dailyReady() : 0) : t.badge ? t.badge() : 0));
+  const opens = TABS.map((t) => (tabOpen(t) ? 1 : 0)).join('');
+  const key = current + '|' + badges.join(',') + '|' + opens;
   if (!force && key === tabsKey) return; // ничего не изменилось — кнопки не трогаем
   tabsKey = key;
-  tabbarEl.replaceChildren(...TABS.map((t, i) =>
+  tabbarEl.replaceChildren(...TABS.map((t, i) => !tabOpen(t) ? h('span.tab.tab-ph') :
     h((t.play ? 'button.tab-play' : 'button.tab') + (t.id === current ? '.active' : ''),
       { onclick: () => go(t.id), 'data-tab': t.id },
       h('span.ic', t.icon), t.label,
@@ -110,6 +124,8 @@ function renderTabs(force) {
 
 function go(id) {
   current = id;
+  const seen = state.progress.tabsSeen;
+  if (seen && !seen.includes(id)) { seen.push(id); store.commit(); }
   renderTabs();
   refresh();
 }
