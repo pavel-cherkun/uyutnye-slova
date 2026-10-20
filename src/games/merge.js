@@ -1,7 +1,8 @@
 // Мини-игра «Мердж»: бесконечная песочница. Генераторы выдают вещи за ⚡,
 // две одинаковые вещи сливаются в следующую по цепочке своей категории.
 
-import { ITEMS, RARITY, RARITY_ORDER, getItem } from '../data/items.js';
+import { ITEMS, RARITY, RARITY_ORDER, getItem, CATEGORIES } from '../data/items.js';
+import { openThemes, PLACES } from '../data/places.js';
 import { h, toast, modal, confetti } from '../ui/common.js';
 import { floatText, flyTo } from '../ui/fx.js';
 import { sfx, buzz } from '../ui/device.js';
@@ -19,9 +20,9 @@ export const meta = {
 export const COLS = 6;
 export const ROWS = 8;
 export const SIZE = COLS * ROWS;
-export const MERGE_CATS = ['food', 'furniture', 'plants', 'dishes', 'decor', 'fantasy'];
-const GEN_ICONS = { food: '🍎', furniture: '🛋️', plants: '🪴', dishes: '🍽️', decor: '🏺', fantasy: '🦄' };
-const GEN_NAMES = { food: 'Еда', furniture: 'Мебель', plants: 'Растения', dishes: 'Посуда', decor: 'Декор', fantasy: 'Сказка' };
+// Генераторы — по открытым темам (категории открытых мест), как в Поиске и Пасьянсе
+const NO_MERGE = ['misc', 'essence'];
+export function mergeCats(S) { return openThemes(S).filter((c) => !NO_MERGE.includes(c) && chainFor(c).length >= 3); }
 const LEVEL1_CHANCE = 0.15;
 const COMBO_WINDOW = 3000;
 const IDLE_HINT = 5000;
@@ -44,7 +45,7 @@ export function chainFor(cat, items = ITEMS) {
 export function levelOf(id) {
   if (!id) return null;
   const it = getItem(id);
-  if (it.tier !== 1 || !MERGE_CATS.includes(it.cat)) return null;
+  if (it.tier !== 1 || NO_MERGE.includes(it.cat) || !CATEGORIES[it.cat]) return null;
   const chain = chainFor(it.cat);
   const index = chain.indexOf(id);
   return index < 0 ? null : { cat: it.cat, chain, index };
@@ -156,6 +157,7 @@ const CSS = `
 .mg-gen-ic { font-size:28px; line-height:1; }
 .mg-gen-ch { font-family: var(--display); font-size: 10px; font-weight: 800; }
 .mg-gen.empty { filter: grayscale(.8); opacity: .65; }
+.mg-gen.mg-lock { background: #f1f0ea !important; border-style: dashed; }
 .mg-gen-cost { position:absolute; right:-6px; top:-7px; font-family:var(--display); font-weight:800; font-size:10px; background:var(--ink); color:var(--lime);
   border-radius:99px; padding:2px 6px; }
 .mg-gen-name { font-size:9px; font-weight:900; text-transform:uppercase; letter-spacing:.3px; margin-top:2px; }
@@ -268,16 +270,20 @@ export function mount(root, ctx) {
   const unsub = store.subscribe ? store.subscribe(updEnergy) : null;
 
   // ----- Генераторы -----
-  const gens = h('div.mg-gens', MERGE_CATS.map((cat) => {
+  const cats = mergeCats(S);
+  const left = PLACES.length - (S.progress.places || []).length;
+  const gens = h('div.mg-gens', ...cats.map((cat) => {
     const b = h('button.mg-gen', { 'data-cat': cat },
-      h('span.mg-gen-ic', GEN_ICONS[cat]), h('span.mg-gen-name', GEN_NAMES[cat]), h('span.mg-gen-cost', GEN_COST + '⚡'), h('span.mg-gen-ch'));
+      h('span.mg-gen-ic', CATEGORIES[cat].icon), h('span.mg-gen-name', CATEGORIES[cat].name), h('span.mg-gen-cost', GEN_COST + '⚡'), h('span.mg-gen-ch'));
     b.addEventListener('click', () => generate(cat, b));
     return b;
-  }));
+  }), left > 0 ? h('button.mg-gen.mg-lock', { onclick: () => toast('Новые генераторы — это новые темы. Собери в Эрудите название места: САД, ЛЕС, КАФЕ, ШКАФ…', 3600) },
+    h('span.mg-gen-ic', '🔒'), h('span.mg-gen-name', 'ещё темы')) : null);
   const genState = () => ((S.progress.merge ||= { cells: [] }).gens ||= {});
   function updGens() {
     const now = Date.now();
     for (const b of gens.children) {
+      if (!b.dataset.cat) continue;
       const g = genCharges(genState()[b.dataset.cat], now);
       const ch = b.querySelector('.mg-gen-ch');
       if (g.charges > 0) { ch.textContent = `${g.charges}/${GEN_MAX}`; b.classList.remove('empty'); }
@@ -344,7 +350,7 @@ export function mount(root, ctx) {
     const bagBtn = h('button.btn.btn-ghost.mg-bag', { onclick: openBag }, sel >= 0 ? '🎒' : '🎒 Из сумки');
     if (sel < 0 || !cells[sel]) {
       sel = -1;
-      info.append(h('div.mg-hint', 'Тапни генератор (1⚡) и тащи одинаковые вещи друг на друга — получится вещь круче.'));
+      info.append(h('div.mg-hint', `Тапни генератор (${GEN_COST}⚡) и тащи одинаковые вещи друг на друга — получится вещь круче.`));
       actions.append(bagBtn);
       return;
     }
@@ -415,7 +421,7 @@ export function mount(root, ctx) {
       }
     }
     if (g.charges <= 0) {
-      toast(`Генератор отдыхает — заряд через ${Math.ceil((g.at + GEN_RECHARGE - Date.now()) / 60000)} мин. Зарядить можно эссенцией ✨ — собери абстрактное слово в Эрудите`, 3200); sfx('error'); retrigger(btn, 'shake'); return;
+      toast(`Генератор отдыхает — заряд через ${Math.ceil((g.at + GEN_RECHARGE - Date.now()) / 60000)} мин. Или заряди эссенцией ✨: собери в Эрудите слово-чувство — МЕЧТА, РАДОСТЬ, СМЕХ`, 3600); sfx('error'); retrigger(btn, 'shake'); return;
     }
     if (!store.spendEnergy(GEN_COST)) {
       toast('Нужна ⚡ — сожги лишнее в печи'); sfx('error'); buzz([20, 40, 20]); retrigger(btn, 'shake'); return;

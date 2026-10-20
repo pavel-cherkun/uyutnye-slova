@@ -5,6 +5,7 @@
 import { ITEMS, CATEGORIES, getItem } from '../data/items.js';
 import * as WORDS from '../data/words.js';
 import { h, toast, confetti, modal, confirmDialog, shuffle } from '../ui/common.js';
+import { openThemes } from '../data/places.js';
 import { sfx, buzz } from '../ui/device.js';
 
 export const meta = {
@@ -21,22 +22,22 @@ export const meta = {
 // ======================================================================
 
 export const COLS = 4;
-const UNDO_MAX = 3;
+const UNDO_MAX = 2;
 const EXTRA_MOVES = 10;
 const EXTRA_COST = 3;
-const MOVE_K = 1.6;        // лимит ходов = карт × MOVE_K
+const MOVE_K = 1.3;        // лимит ходов = карт × MOVE_K
 const MAX_LEN = 9;         // слова длиннее не помещаются на карту
 const DEAL_TRIES = 40;     // сколько раздач перебрать в поисках решаемой
-const MOVE_SLACK = 0.25;   // запас к ходам жадного решателя, доля от числа карт
+const MOVE_SLACK = 0.12;   // запас к ходам жадного решателя, доля от числа карт
 const HISTORY_MAX = 60;
 
 /** Параметры уровня: K категорий, N слов в каждой, slots ячеек-стопок. */
 export function levelParams(level) {
-  const K = level <= 2 ? 3 : level <= 6 ? 4 : 5;
-  const N = level <= 5 ? 4 : level <= 9 ? 5 : level <= 15 ? 6 : 7;
-  // На первых уровнях ячеек хватает на все категории, дальше на одну меньше —
-  // приходится закрывать стопки, чтобы освободить место.
-  const slots = K <= 3 ? K : K - 1;
+  // Сложнее, чем раньше: больше категорий и слов быстрее, ячеек меньше, ходов в обрез.
+  const K = level <= 1 ? 3 : level <= 4 ? 4 : level <= 10 ? 5 : 6;
+  const N = level <= 1 ? 4 : level <= 4 ? 5 : level <= 9 ? 6 : 7;
+  // Ячеек меньше, чем категорий, — приходится закрывать стопки, чтобы освободить место.
+  const slots = level <= 1 ? K : level <= 7 ? K - 1 : K - 2;
   return { K, N, slots };
 }
 
@@ -92,7 +93,7 @@ export function cloneGame(g) { return { ...g, ...JSON.parse(snap(g)), history: [
 function dealWith(base, rng) {
   const ids = shuffle(Object.keys(base.cards), rng);
   const T = ids.length;
-  const downs = T < 24 ? [0, 1, 2, 3] : [1, 2, 3, 4];
+  const downs = T < 24 ? [1, 2, 3, 4] : [2, 3, 4, 5];
   const cols = downs.map((d) => ({ ids: ids.splice(0, d + 1), down: d }));
   return {
     ...base,
@@ -122,7 +123,11 @@ export function newGame(level, opts = {}) {
   if (eligible.length < p.K) p.K = Math.max(1, eligible.length);
   if (p.slots > p.K) p.slots = p.K;
   const own = opts.own || null; // { cat: ['СЛОВО', ...] } — карточки игрока
-  const cats = own ? Object.keys(own).slice(0, p.K) : shuffle(eligible, rngCat).slice(0, p.K);
+  // сначала — открытые темы (категории открытых мест), недостающие добираем из остальных
+  const themes = opts.themes || [];
+  const mine = shuffle(eligible.filter((c) => themes.includes(c)), rngCat);
+  const others = shuffle(eligible.filter((c) => !themes.includes(c)), rngCat);
+  const cats = own ? Object.keys(own).slice(0, p.K) : [...mine, ...others].slice(0, p.K);
   if (own) { p.K = cats.length; if (p.slots > p.K) p.slots = p.K; }
 
   const cards = {};
@@ -165,7 +170,7 @@ export function newGame(level, opts = {}) {
   if (!g) {
     g = dealWith(base, mulberry32(seed * 7919 + 1));
     g.solverMoves = null;
-    g.limit = Math.ceil(T * 2);
+    g.limit = Math.ceil(T * 1.6);
   }
   return g;
 }
@@ -572,7 +577,7 @@ function playGame(root, ctx, own) {
   const store = ctx.store;
   const progress = store.state.progress;
   const level = Math.max(1, (progress.solitaireLevel | 0) || 1);
-  const g = newGame(level, { own });
+  const g = newGame(level, { own, themes: openThemes(store.state) });
 
   let alive = true;
   let over = false;

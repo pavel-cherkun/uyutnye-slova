@@ -6,6 +6,7 @@ import { itemsByCat, CATEGORIES, getItem, RARITY } from '../data/items.js';
 import { h, toast, modal, confetti, confirmDialog, shuffle } from '../ui/common.js';
 import { floatText } from '../ui/fx.js';
 import { sfx, buzz } from '../ui/device.js';
+import { spellModal } from '../ui/spell.js';
 
 export const meta = {
   id: 'match3',
@@ -1064,7 +1065,7 @@ function playLevel(root, ctx, chosen) {
   function updateBoosts() {
     for (const b of boosts) {
       const n = store.itemCount(b.id);
-      b.n.textContent = n > 0 ? '×' + n : '0';
+      b.n.textContent = n > 0 ? '×' + n : '+'; // «+» — можно скрафтить из букв прямо здесь
       b.btn.classList.toggle('m3-empty', n <= 0);
       b.btn.classList.toggle('m3-on', boost === b);
     }
@@ -1080,8 +1081,10 @@ function playLevel(root, ctx, chosen) {
   function onBoostBtn(b) {
     if (!alive || ended) return;
     if (store.itemCount(b.id) <= 0) {
-      sfx('error'); buzz(20);
-      toast(`Нет ${b.gen}. Собери слово ${b.id} в Эрудите`, 2600);
+      // бустер можно сделать из букв, не выходя из игры
+      if (busy) return;
+      spellModal({ word: b.id, title: b.name, icon: b.emoji, sub: `Набери «${b.id}» — и ${b.name.toLowerCase()} у тебя`,
+        onDone: () => { store.addItem(b.id, 1); store.commit(); updateBoosts(); toast(`${b.emoji} ${b.name} готов!`, 1400); } });
       return;
     }
     if (busy) return;

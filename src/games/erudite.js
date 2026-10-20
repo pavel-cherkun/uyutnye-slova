@@ -375,6 +375,13 @@ export function mount(root, ctx) {
 
     store.addItem(c.id);
     emoji = getItem(c.id).emoji;
+    // эссенция — объяснить один раз, что это и зачем
+    if (c.kind === 'essence') {
+      if (!state.progress.essSeen) {
+        state.progress.essSeen = true;
+        later(() => petTip(`✨ «${w}» — это эссенция! Слова-чувства и явления (мечта, смех, весна) становятся эссенциями. Они заряжают уставшие генераторы в Мердже и жарко горят в печи.`, 9000), 900);
+      } else later(() => floatText('✨ эссенция', innerWidth / 2, innerHeight * 0.35), 500);
+    }
     if (c.kind === 'item') confetti(innerWidth / 2, innerHeight / 3, 30);
     const rar = c.kind === 'room' ? 'l' : getItem(c.id).rarity;
     made.unshift({ word: w, emoji, rar });
@@ -391,7 +398,7 @@ export function mount(root, ctx) {
     let xp = (c.kind === 'room' ? 40 : WORD_XP[rar]) * (first ? 2 : 1);
     if (unlockPlace(state, w)) {
       const pl = placeForWord(w);
-      const flash = h('div.er-flash.rar-l', h('b', `${pl.icon} ${pl.word}!`), h('i', 'новое место в Поиске'));
+      const flash = h('div.er-flash.rar-l', h('b', `${pl.icon} ${pl.word}!`), h('i', 'новые темы: Поиск · Мердж · Пасьянс'));
       document.body.append(flash); later(() => flash.remove(), 1800);
       confetti(innerWidth / 2, innerHeight / 3, 60);
       xp += 30;
