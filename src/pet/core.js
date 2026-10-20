@@ -7,7 +7,8 @@ import { state, commit, applyReward } from '../state.js';
 import { ITEMS, eatValue } from '../data/items.js';
 import { gainXP, chestReward } from '../progression.js';
 import { randomLetter } from '../data/letters.js';
-import { createLlama } from '../ui/llama.js';
+import { createPet, SPECIES } from '../ui/llama.js';
+import '../ui/species.js';
 import { destById } from '../data/travel.js';
 import { sfx } from '../ui/device.js';
 
@@ -155,9 +156,9 @@ export function claimTravel(p, frac, onDone) {
 // ---------- Вид питомца ----------
 /** Лама — живой SVG; остальные — эмодзи с тем же набором методов */
 export function petView(p, opts = {}) {
-  if (p.kind === 'llama') {
-    const ll = createLlama(opts);
-    ll.setLook(p.look || { wool: 'cream' });
+  if (SPECIES[p.kind]) {
+    const ll = createPet(p.kind, opts);
+    ll.setLook(p.look || {});
     ll.setAge(ageOf(p));
     ll.setTricks(p.tricks || []);
     return ll;

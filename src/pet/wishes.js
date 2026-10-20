@@ -68,8 +68,8 @@ export function markWish(p, type, target) {
   w.done = true;
   p.wishesDone = (p.wishesDone || 0) + 1;
   let letters = '';
-  for (let i = 0; i < 3; i++) letters += randomLetter();
-  const reward = { energy: 6, letters };
+  for (let i = 0; i < 4; i++) letters += randomLetter();
+  const reward = { energy: 3, letters };
   if (Math.random() < 0.15) reward.keys = 1;
   applyReward(reward);
   commit();
