@@ -36,7 +36,8 @@ export function checkLetterUnlock() {
 
 // ---------- Уровень игрока ----------
 
-const xpFor = (lvl) => 40 + (lvl - 1) * 30; // сколько опыта нужно на уровень lvl → lvl+1
+// сколько опыта нужно на уровень lvl → lvl+1: 60, 123, 202, 297, 408… — каждый следующий заметно длиннее
+const xpFor = (lvl) => 60 + (lvl - 1) * 55 + (lvl - 1) ** 2 * 8;
 
 export function levelInfo(xp = state.xp || 0) {
   let lvl = 1, rest = xp;
@@ -68,7 +69,7 @@ export function gainXP(n, at, { merge = false } = {}) {
 function levelReward(lvl) {
   let letters = '';
   for (let i = 0; i < 4 + lvl; i++) letters += rl();
-  const reward = { energy: 10 + lvl * 2, letters };
+  const reward = { energy: 5 + lvl, letters };
   if (lvl % 2 === 0) reward.keys = 1;
   if (lvl % 3 === 0) {
     const pool = ITEMS.filter((it) => it.rarity === (lvl % 6 === 0 ? 'l' : 'e'));
@@ -87,7 +88,7 @@ export function chestReward(tier = 'wood', { noKeys = false } = {}) {
   const k = { wood: 1, silver: 2, gold: 3 }[tier];
   let letters = '';
   for (let i = 0; i < 3 + k * 3; i++) letters += rl();
-  const reward = { energy: 6 + k * 6, letters, items: {} };
+  const reward = { energy: 2 + k * 4, letters, items: {} };
   if (!noKeys && (k >= 2 || Math.random() < 0.35)) reward.keys = k >= 3 ? 2 : 1;
   const rolls = k + 1;
   for (let i = 0; i < rolls; i++) {
