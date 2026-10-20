@@ -46,3 +46,18 @@ export function unlockPlace(state, word) {
   list.push(p.word);
   return true;
 }
+
+/**
+ * Темы — общие для Поиска, Мерджа и Пасьянса: это категории всех открытых мест.
+ * Открыла место словом в Эрудите → его категории появились во всех трёх играх.
+ */
+export function openThemes(state) {
+  const out = [];
+  for (const p of openPlaces(state)) for (const c of p.cats) if (!out.includes(c)) out.push(c);
+  return out;
+}
+/** Сколько тем откроет ещё не открытое место */
+export function placeNewThemes(state, place) {
+  const have = openThemes(state);
+  return place.cats.filter((c) => !have.includes(c));
+}
