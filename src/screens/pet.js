@@ -6,7 +6,7 @@ import { h, toast, modal } from '../ui/common.js';
 import { floatText } from '../ui/fx.js';
 import { state, commit, removeItem } from '../state.js';
 import { getItem, CATEGORIES, eatValue } from '../data/items.js';
-import { WARDROBE, SLOTS, WOOL, TRICKS, itemPreview, createLlama } from '../ui/llama.js';
+import { WARDROBE, SLOTS, WOOL, TRICKS, itemPreview, createPet, SPECIES } from '../ui/llama.js';
 import { spellModal, missingLetters } from '../ui/spell.js';
 import { playBall } from '../ui/ballgame.js';
 import { DESTS, destById, sceneSVG } from '../data/travel.js';
@@ -103,9 +103,9 @@ function adoptView(rerender) {
 }
 
 function kindIcon(k) {
-  if (k.kind !== 'llama') return k.emoji;
-  const ll = createLlama({ still: true });
-  ll.setLook({ wool: 'cream' });
+  if (!SPECIES[k.kind]) return k.emoji;
+  const ll = createPet(k.kind, { still: true });
+  ll.setLook({});
   ll.setAge('baby');
   return h('div.pt-mini', ll.el);
 }
@@ -135,8 +135,8 @@ function kindModal(p, rerender) {
 // ---------- Дом питомца ----------
 function homeView(p, rerender, nav) {
   const kind = kindOf(p);
-  const isLlama = p.kind === 'llama';
-  p.bowl ||= []; p.look ||= { wool: 'cream' }; p.tricks ||= [];
+  const isLlama = !!SPECIES[p.kind]; // «живой» нарисованный питомец (сейчас — все виды)
+  p.bowl ||= []; p.look ||= {}; p.tricks ||= [];
   if (p.clean == null) p.clean = 100;
   const tut = (p.tut ||= {});
   const age = ageOf(p);
@@ -484,7 +484,7 @@ export function fitIcon(svg) {
 }
 
 function wardrobeModal(p, rerender, onChange) {
-  p.look ||= { wool: 'cream' };
+  p.look ||= {};
   p.wardrobe ||= ['wool:cream'];
   const before = JSON.stringify(p.look);
   let slot = 'head';
@@ -492,7 +492,8 @@ function wardrobeModal(p, rerender, onChange) {
   prev.setDirt(0);
   const tabs = h('div.wd-tabs');
   const grid = h('div.wd-grid');
-  const has = (w) => !w.word || p.wardrobe.includes(w.slot + ':' + w.id);
+  const baseWool = SPECIES[p.kind]?.wool || 'cream'; // родной окрас вида — всегда свой
+  const has = (w) => !w.word || p.wardrobe.includes(w.slot + ':' + w.id) || (w.slot === 'wool' && w.id === baseWool);
   const wear = (w) => {
     if (w.slot !== 'wool' && p.look[w.slot] === w.id) delete p.look[w.slot];
     else p.look[w.slot] = w.id;
@@ -505,7 +506,7 @@ function wardrobeModal(p, rerender, onChange) {
     tabs.replaceChildren(...SLOTS.map((s) => h('button.wd-tab' + (s.id === slot ? '.on' : ''), { onclick: () => { slot = s.id; draw(); } }, s.name)));
     grid.replaceChildren(...WARDROBE.filter((w) => w.slot === slot).map((w) => {
       const own = has(w);
-      const on = p.look[w.slot] === w.id;
+      const on = (w.slot === 'wool' ? (p.look.wool || baseWool) : p.look[w.slot]) === w.id;
       const pic = h('div.wd-pic');
       if (w.slot === 'wool') pic.append(h('span.wd-swatch', { style: { background: WOOL[w.id][0], boxShadow: `inset -6px -8px 0 ${WOOL[w.id][1]}, 0 0 0 3px #111` } }));
       else pic.innerHTML = itemPreview(w.slot, w.id);

@@ -71,7 +71,7 @@ export function maybeDailyGift(onDone) {
   const day = p.giftStreak;
   let letters = '';
   for (let i = 0; i < 6 + day; i++) letters += randomLetter();
-  const reward = { energy: 10 + day * 2, letters };
+  const reward = { energy: 6 + day, letters };
   if (day === 7) reward.keys = 1;
   applyReward(reward);
   commit();

@@ -68,6 +68,7 @@ function itemsView(tierGroup, rerender, nav) {
   return h('div.stack', order.filter((c) => byCat[c]).map((cat) =>
     h('div.bag-group',
       h('div.bag-cat', CATEGORIES[cat].icon + ' ' + CATEGORIES[cat].name),
+      cat === 'essence' ? h('div.small.muted', 'Слова-чувства из Эрудита. Заряжают генераторы в Мердже, жарко горят в печи') : null,
       h('div.bag-grid', byCat[cat].sort((a, b) => a.it.word.localeCompare(b.it.word)).map(({ it, n }) =>
         h('button.bag-item', { style: { '--rar': RARITY[it.rarity].color }, onclick: () => itemMenu(it.id, rerender, nav) },
           h('span.bag-emoji', it.emoji),
